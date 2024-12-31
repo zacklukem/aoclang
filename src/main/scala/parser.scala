@@ -101,6 +101,24 @@ class Parser(source: Source):
     lx.peek match
       case Tok.Key("{") => parseBlockExpr
 
+      case Tok.Key("match") =>
+        val l = lx.next
+        val expr = parseSingleExpr
+        expectEq(lx.next, Tok.Key("{"))
+        val cases = mutable.ListBuffer.empty[MatchCase]
+
+        while lx.peek != Tok.Key("}") do
+          val pat = parsePat
+          expectEq(lx.next, Tok.Key("=>"))
+          val body = parseSingleExpr
+          cases += MatchCase(pat, body)
+          if lx.peek == Tok.Key(",") then lx.next
+          else expectEq(lx.peek, Tok.Key("}"))
+
+        val r = lx.next
+        expectEq(r, Tok.Key("}"))
+        Expr.Match(expr, l.asInstanceOf, cases.toList, r.asInstanceOf)
+
       case Tok.Key("if") =>
         lx.next
         val cond = parseSingleExpr

@@ -38,7 +38,26 @@ private class Scanner(source: Source):
     source.span(start, end)
 
 val KEYWORDS =
-  Set("def", "let", "if", "else", "intrinsic", "(", ")", "{", "}", "[", "]", "=", ":", ",", ".")
+  Set(
+    "def",
+    "let",
+    "if",
+    "else",
+    "match",
+    "intrinsic",
+    "(",
+    ")",
+    "{",
+    "}",
+    "[",
+    "]",
+    "=",
+    ":",
+    ",",
+    ".",
+    "=>"
+  )
+
 val OPERATOR_CHARS =
   Set('+', '-', '*', '/', '=', '!', '<', '>', '&', '|', '^', '~', '%', '?', ':', '.', ',')
 

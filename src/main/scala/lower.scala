@@ -48,6 +48,8 @@ enum Tree:
         body.pretty(depth)
       case Tree.If(cond, thenC, elseC) =>
         line(s"if ${cond} then ${thenC} else ${elseC}")
+      case Tree.Raise(value) =>
+        line(s"raise ${value}")
 
 enum LowDecl:
   case Def(args: List[Symbol], body: Tree)
@@ -235,9 +237,12 @@ class LowerExpr(
         lower(cond) { cond =>
           val thenSym = Symbol.local
           val elseSym = Symbol.local
-          letc(Nil, lower(thenE)(c)) { thenC =>
-            letc(Nil, lower(elseE)(c)) { elseC =>
-              Tree.If(cond, thenC, elseC)
+          val res = Symbol.local
+          letc(List(res), c(res)) { c =>
+            letc(Nil, lower_tail(thenE)(c)) { thenC =>
+              letc(Nil, lower_tail(elseE)(c)) { elseC =>
+                Tree.If(cond, thenC, elseC)
+              }
             }
           }
         }
@@ -261,6 +266,22 @@ class LowerExpr(
             letc(List(res), c(res))(
               Tree.AppF("Tuple" :@: "get", _, List(tup, idx))
             )
+          }
+        }
+
+      case Expr.Match(expr, _, cases, _) =>
+        val res = Symbol.local
+        letc(List(res), c(res)) { c =>
+          lower(expr) { expr =>
+            val fail = letl("match error")(Tree.Raise(_))
+            cases.foldRight(fail) { case (MatchCase(pat, body), next) =>
+              lower_pat(pat, expr) {
+                case Some(bindings) =>
+                  lower_tail(body)(c)(using sym ++ bindings)
+                case None =>
+                  next
+              }
+            }
           }
         }
 
@@ -328,5 +349,18 @@ class LowerExpr(
         lower(tup) { tup =>
           letl(idx) { idx =>
             Tree.AppF("Tuple" :@: "get", c, List(tup, idx))
+          }
+        }
+
+      case Expr.Match(expr, _, cases, _) =>
+        lower(expr) { expr =>
+          val fail = letl("match error")(Tree.Raise(_))
+          cases.foldRight(fail) { case (MatchCase(pat, body), next) =>
+            lower_pat(pat, expr) {
+              case Some(bindings) =>
+                lower_tail(body)(c)(using sym ++ bindings)
+              case None =>
+                next
+            }
           }
         }

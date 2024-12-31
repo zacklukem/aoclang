@@ -46,7 +46,7 @@ def main(): Unit =
   moduleAsts.foreach({ case (mod, decls) => lower.declare(mod, decls) })
   moduleAsts.foreach({ case (mod, decls) => lower.lower(mod, decls) })
 
-//  lower.decls(Symbol.Global(List("List", "main"))).pretty()
+  lower.decls.toMap.apply("List" :@: "rev_tail").pretty()
 
   val interp = Interp(lower.decls.toMap)
 
@@ -57,19 +57,3 @@ def main(): Unit =
   val time = (System.nanoTime - start) / 1e6
 
   println(s"Execution time: $time ms")
-
-//  val start2 = System.nanoTime
-//  runfib()
-//  val time2 = (System.nanoTime - start2) / 1e6
-//
-//  println(s"Execution time2: $time2 ms")
-
-//def fibrec(a: Long, b: Long, n: Long): Unit =
-//  if n != 0 then
-//    fibrec(b, a + b, n - 1)
-//    println("fib: " + b)
-//
-//def fib(k: Long) = fibrec(0, 1, k)
-//
-//def runfib() =
-//  80L |> fib |> println

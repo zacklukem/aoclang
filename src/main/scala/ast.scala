@@ -20,6 +20,8 @@ enum Pat(span: Span) extends Node(span):
   case Tuple(l: Tok.Key, pats: List[Pat], r: Tok.Key) extends Pat(l.span.get ++ r.span.get)
   case Lit(value: Tok.Lit) extends Pat(value.span.get)
 
+case class MatchCase(pat: Pat, body: Expr)
+
 enum Expr(span: Span) extends Node(span):
   case App(fn: Expr, args: List[Expr])
       extends Expr(args.lastOption.map(_.span ++ fn.span).getOrElse(fn.span))
@@ -37,6 +39,9 @@ enum Expr(span: Span) extends Node(span):
 
   case If(cond: Expr, thenBranch: Expr, elseBranch: Option[Expr])
       extends Expr(cond.span ++ elseBranch.getOrElse(thenBranch).span)
+
+  case Match(expr: Expr, l: Tok.Key, cases: List[MatchCase], r: Tok.Key)
+      extends Expr(expr.span ++ r.span.get)
 
   case Field(expr: Expr, field: Tok.Id) extends Expr(expr.span ++ field.span.get)
 

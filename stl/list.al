@@ -28,11 +28,9 @@ def foreach(a, f) = {
 }
 
 def rev_tail(list, acc) = {
-  if list == 'nil {
-    acc
-  } else {
-    let (head, tail) = list
-    rev_tail(tail, head :: acc)
+  match list {
+    'nil => acc,
+    (head, tail) => rev_tail(tail, head :: acc),
   }
 }
 
@@ -41,10 +39,8 @@ def rev(list) = {
 }
 
 def map(a, f) = {
-  if a == 'nil {
-    'nil
-  } else {
-    let (head, tail) = a
-    f(head) :: map(tail, f)
+  match a {
+    'nil => 'nil,
+    (head, tail) => f(head) :: map(tail, f),
   }
 }
