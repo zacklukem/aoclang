@@ -46,11 +46,11 @@ def main(): Unit =
   moduleAsts.foreach({ case (mod, decls) => lower.declare(mod, decls) })
   moduleAsts.foreach({ case (mod, decls) => lower.lower(mod, decls) })
 
-  lower.decls(Symbol.Global(List("Fib", "fibrec"))).pretty()
+//  lower.decls(Symbol.Global(List("List", "main"))).pretty()
 
   val interp = Interp(lower.decls.toMap)
 
-  val LowDecl.Def(_, main) = interp.decls(Symbol.Global(List("Fib", "main")))
+  val LowDecl.Def(_, main) = interp.decls(Symbol.Global(List("Lists", "main")))
 
   val start = System.nanoTime
   interp.eval(main)(using Map.empty)

@@ -21,8 +21,9 @@ def range(a, b) = {
 
 def foreach(a, f) = {
   if a != 'nil {
-    f(a.0)
-    foreach(a.1, f)
+    let (head, tail) = a
+    f(head)
+    foreach(tail, f)
   }
 }
 
@@ -30,7 +31,8 @@ def rev_tail(list, acc) = {
   if list == 'nil {
     acc
   } else {
-    rev_tail(list.1, list.0 :: acc)
+    let (head, tail) = list
+    rev_tail(tail, head :: acc)
   }
 }
 
@@ -42,6 +44,7 @@ def map(a, f) = {
   if a == 'nil {
     'nil
   } else {
-    f(a.0) :: map(a.1, f)
+    let (head, tail) = a
+    f(head) :: map(tail, f)
   }
 }

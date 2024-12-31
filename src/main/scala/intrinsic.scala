@@ -19,6 +19,14 @@ val INTRINSICS = Map[String, List[Value] => Value](
   "get" -> { case List(Value.Tuple(tup), Value.Lit(idx: Long)) =>
     tup(idx.toInt)
   },
+  "is" -> {
+    case List(Value.Tuple(_)) => Value.Lit(true)
+    case _                    => Value.Lit(false)
+  },
+  "size" -> {
+    case List(Value.Tuple(tup)) => Value.Lit(tup.length.toLong)
+    case _                      => xcept("Invalid types for (Tuple.size)")
+  },
   "==" -> { case List(a, b) => Value.Lit(a == b) },
   "!=" -> { case List(a, b) => Value.Lit(a != b) },
   ">" -> {

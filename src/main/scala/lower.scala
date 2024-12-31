@@ -28,6 +28,7 @@ enum Tree:
   case LetC(name: Symbol, args: List[Symbol], value: Tree, body: Tree)
   case LetL(name: Symbol, value: LitValue, body: Tree)
   case If(cond: Symbol, thenC: Symbol, elseC: Symbol)
+  case Raise(value: Symbol)
 
   def pretty(depth: Int = 0): Unit =
     def line(s: String) = println("  " * depth + s)
@@ -60,6 +61,8 @@ enum LowDecl:
         println("}")
       case LowDecl.Intrinsic(name) =>
         println(s"intrinsic ${name}")
+
+extension (s: String) def :@:(b: String): Symbol = Symbol.Global(List(s, b))
 
 class Lower:
   val modules: mutable.Map[String, Map[String, Symbol]] = mutable.Map()
@@ -120,6 +123,70 @@ class LowerExpr(
     val sym = Symbol.local
     Tree.LetC(sym, args, value, body(sym))
 
+  private def app(fn: Symbol, args: List[Symbol])(thenC: Symbol => Tree): Tree =
+    val ret = Symbol.local
+    letc(List(ret), thenC(ret)) { retC =>
+      Tree.AppF(fn, retC, args)
+    }
+
+  private def iff(cond: Symbol)(thenT: => Tree)(elseT: => Tree): Tree =
+    letc(List(), thenT) { thenC =>
+      letc(List(), elseT) { elseC =>
+        Tree.If(cond, thenC, elseC)
+      }
+    }
+
+  def lower_pat_product(p: Seq[(Pat, Int)], rhs: Symbol)(
+      c: Option[Map[Tok.Id | Tok.Op, Symbol]] => Tree
+  ): Tree =
+    p match
+      case Seq() => c(Some(Map.empty))
+      case (p, idx) +: rest =>
+        letl(idx.toLong) { idx =>
+          app("Tuple" :@: "get", List(rhs, idx)) { value =>
+            lower_pat(p, value) {
+              case Some(bindings) =>
+                lower_pat_product(rest, rhs)({ v => c(v.map(_ ++ bindings)) })
+              case None => c(None)
+            }
+          }
+        }
+
+  def lower_pat(p: Pat, rhs: Symbol)(c: Option[Map[Tok.Id | Tok.Op, Symbol]] => Tree) =
+    p match
+      case Pat.Bind(binding) =>
+        c(Some(Map(binding -> rhs)))
+
+      case Pat.Lit(Tok.Lit(lit)) =>
+        letl(lit) { lit =>
+          app("Stl" :@: "==", List(rhs, lit)) { is_eq =>
+            iff(is_eq) {
+              c(Some(Map.empty))
+            } {
+              c(None)
+            }
+          }
+        }
+
+      case Pat.Tuple(_, pats, _) =>
+        app("Tuple" :@: "is", List(rhs)) { is_tuple =>
+          iff(is_tuple) {
+            app("Tuple" :@: "size", List(rhs)) { size =>
+              letl(pats.size.toLong) { expected_size =>
+                app("Stl" :@: "==", List(size, expected_size)) { is_eq =>
+                  iff(is_eq) {
+                    lower_pat_product(pats.zipWithIndex, rhs)(c)
+                  } {
+                    c(None)
+                  }
+                }
+              }
+            }
+          } {
+            c(None)
+          }
+        }
+
   def lower(e: Option[Expr])(c: Symbol => Tree)(using sym: Map[Tok.Id | Tok.Op, Symbol]): Tree =
     e
       .map(lower(_)(c))
@@ -135,9 +202,14 @@ class LowerExpr(
 
   def lower(e: Expr)(c: Symbol => Tree)(using sym: Map[Tok.Id | Tok.Op, Symbol]): Tree =
     e match
-      case Expr.Let(Pat.Bind(binding), rhs, body) =>
+      case Expr.Let(pat, rhs, body) =>
         lower(rhs) { value =>
-          lower(body)(c)(using sym + (binding -> value))
+          lower_pat(pat, value) {
+            case Some(bindings) =>
+              lower(body)(c)(using sym ++ bindings)
+            case None =>
+              letl("match error")(Tree.Raise(_))
+          }
         }
 
       case Expr.App(fn, args) =>
@@ -179,7 +251,7 @@ class LowerExpr(
       case Expr.Tuple(_, elems, _) =>
         lower(elems) { args =>
           val res = Symbol.local
-          letc(List(res), c(res))(Tree.AppF(Symbol.Global(List("Tuple", "new")), _, args))
+          letc(List(res), c(res))(Tree.AppF("Tuple" :@: "new", _, args))
         }
 
       case Expr.TupleField(tup, Tok.Lit(idx: Long)) =>
@@ -187,7 +259,7 @@ class LowerExpr(
           val res = Symbol.local
           letl(idx) { idx =>
             letc(List(res), c(res))(
-              Tree.AppF(Symbol.Global(List("Tuple", "get")), _, List(tup, idx))
+              Tree.AppF("Tuple" :@: "get", _, List(tup, idx))
             )
           }
         }
@@ -201,9 +273,14 @@ class LowerExpr(
     def cf(s: Symbol) = Tree.AppC(c, List(s))
 
     e match
-      case Expr.Let(Pat.Bind(binding), rhs, body) =>
+      case Expr.Let(pat, rhs, body) =>
         lower(rhs) { value =>
-          lower_tail(body)(c)(using sym + (binding -> value))
+          lower_pat(pat, value) {
+            case Some(bindings) =>
+              lower_tail(body)(c)(using sym ++ bindings)
+            case None =>
+              letl("match error")(Tree.Raise(_))
+          }
         }
 
       case Expr.App(fn, args) =>
@@ -244,12 +321,12 @@ class LowerExpr(
       case Expr.Tuple(_, elems, _) =>
         lower(elems) { args =>
           val res = Symbol.local
-          letc(List(res), cf(res))(Tree.AppF(Symbol.Global(List("Tuple", "new")), _, args))
+          letc(List(res), cf(res))(Tree.AppF("Tuple" :@: "new", _, args))
         }
 
       case Expr.TupleField(tup, Tok.Lit(idx: Long)) =>
         lower(tup) { tup =>
           letl(idx) { idx =>
-            Tree.AppF(Symbol.Global(List("Tuple", "get")), c, List(tup, idx))
+            Tree.AppF("Tuple" :@: "get", c, List(tup, idx))
           }
         }

@@ -77,3 +77,6 @@ class Interp(val decls: Map[Symbol, LowDecl]):
         else
           val (body, fenvp) = appc_env(elseC, Nil)
           eval(body)(using fenvp)
+
+      case Tree.Raise(v) =>
+        throw new Exception(s"raised: ${genv(v)}")

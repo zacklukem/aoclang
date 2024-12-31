@@ -39,8 +39,26 @@ class Parser(source: Source):
 
         Decl.Def(name, args, body)
 
-  def parsePat =
+  def parsePatList: List[Pat] =
+    val args = mutable.ListBuffer.empty[Pat]
+    while lx.peek != Tok.Key(")") do
+      args += parsePat
+      if lx.peek == Tok.Key(",") then lx.next
+      else expectEq(lx.peek, Tok.Key(")"))
+    args.toList
+
+  def parsePat: Pat =
     lx.peek match
+      case Tok.Key("(") =>
+        val l = lx.next
+        val pats = parsePatList
+        val r = lx.next
+        expectEq(r, Tok.Key(")"))
+        if pats.length == 1 then pats.head
+        else Pat.Tuple(l.asInstanceOf, pats, r.asInstanceOf)
+      case lit: Tok.Lit =>
+        lx.next
+        Pat.Lit(lit)
       case tok @ Tok.Id(_) =>
         lx.next
         Pat.Bind(tok)
