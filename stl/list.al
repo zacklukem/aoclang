@@ -27,16 +27,10 @@ def foreach(a, f) = {
   }
 }
 
-def rev_tail(list, acc) = {
-  match list {
-    'nil => acc,
-    (head, tail) => rev_tail(tail, head :: acc),
-  }
-}
+def rev_tail('nil, acc) = acc
+def rev_tail((head, tail), acc) = rev_tail(tail, head :: acc)
 
-def rev(list) = {
-  rev_tail(list, 'nil)
-}
+def rev(list) = rev_tail(list, 'nil)
 
 def map(a, f) = {
   match a {
