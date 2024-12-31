@@ -1,3 +1,4 @@
+def add1(x) = x + 1
 
 def main() = {
   println("Length of nil: " ++ len('nil))
@@ -6,6 +7,9 @@ def main() = {
 
   println("Range of 0 to 0: " ++ range(0, 0))
   println("Range of 0 to 5: " ++ range(0, 5))
+
+  println("Add1 Range of 0 to 5: " ++ map(range(0, 5), add1))
+  println("Rev Range of 0 to 5: " ++ rev(range(0, 5)))
 
   foreach(range(0, 5), println)
 }

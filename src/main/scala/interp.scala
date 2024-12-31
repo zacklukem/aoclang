@@ -1,5 +1,7 @@
 package aoclang
 
+import scala.annotation.tailrec
+
 enum Value:
   case Tuple(vs: Array[Value])
   case Lit(v: LitValue)
@@ -7,19 +9,20 @@ enum Value:
   case Cnt(args: List[Symbol], body: Tree, env: Map[Symbol, Value])
 
 class Interp(val decls: Map[Symbol, LowDecl]):
+  private def evalNonTail(e: Tree)(using env: Map[Symbol, Value]): Value = eval(e)
 
-  def eval(e: Tree)(using env: Map[Symbol, Value]): Value =
+  @tailrec
+  final def eval(e: Tree)(using env: Map[Symbol, Value]): Value =
     def deepDecl(s: Symbol): LowDecl = decls.get(s) match
       case Some(d) => d
       case None =>
         val Value.FnRef(ref) = env(s)
         deepDecl(ref)
 
-    def appc(fn: Symbol, args: List[Value]): Value =
+    def appc_env(fn: Symbol, args: List[Value]) =
       val Value.Cnt(argSyms, body, fenv) = env(fn)
       val fenvp = fenv ++ argSyms.zip(args).toMap
-
-      eval(body)(using fenvp)
+      (body, fenvp)
 
     def genv(s: Symbol): Value =
       env.getOrElse(
@@ -30,18 +33,33 @@ class Interp(val decls: Map[Symbol, LowDecl]):
       )
 
     e match
-      case Tree.AppF(fn, retC, args) =>
-        val res = deepDecl(fn) match
+      case Tree.AppF(fn, Symbol.Ret, args) =>
+        deepDecl(fn) match
           case LowDecl.Def(argSyms, tree) =>
             val fenv = argSyms.zip(args.map(genv)).toMap
             eval(tree)(using fenv)
           case LowDecl.Intrinsic(f) =>
             INTRINSICS(f)(args.map(genv))
 
-        appc(retC, List(res))
+      case Tree.AppF(fn, retC, args) =>
+        val res = deepDecl(fn) match
+          case LowDecl.Def(argSyms, tree) =>
+            val fenv = argSyms.zip(args.map(genv)).toMap
+            evalNonTail(tree)(using fenv)
+          case LowDecl.Intrinsic(f) =>
+            INTRINSICS(f)(args.map(genv))
 
-      case Tree.AppC(fn, args) =>
-        appc(fn, args.map(genv))
+        if retC == Symbol.Ret then res
+        else
+          val (body, fenvp) = appc_env(retC, List(res))
+          eval(body)(using fenvp)
+
+      case Tree.AppC(fn, rawArgs) =>
+        val args = rawArgs.map(genv)
+        if fn == Symbol.Ret then args.head
+        else
+          val (body, fenvp) = appc_env(fn, args)
+          eval(body)(using fenvp)
 
       case Tree.LetC(name, args, value, body) =>
         val cnt = Value.Cnt(args, value, env)
@@ -53,8 +71,9 @@ class Interp(val decls: Map[Symbol, LowDecl]):
 
       case Tree.If(cond, thenC, elseC) =>
         val Value.Lit(b: Boolean) = genv(cond)
-        if b then appc(thenC, Nil)
-        else appc(elseC, Nil)
-
-      case Tree.Ret(value) =>
-        genv(value)
+        if b then
+          val (body, fenvp) = appc_env(thenC, Nil)
+          eval(body)(using fenvp)
+        else
+          val (body, fenvp) = appc_env(elseC, Nil)
+          eval(body)(using fenvp)
