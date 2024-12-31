@@ -124,10 +124,12 @@ class Parser(source: Source):
   def parsePrimaryExpr =
     var expr = lx.peek match
       case Tok.Key("(") =>
-        lx.next
-        val expr = parseSingleExpr
-        expectEq(lx.next, Tok.Key(")"))
-        expr
+        val l = lx.next
+        val exprs = parseArgList
+        val r = lx.next
+        expectEq(r, Tok.Key(")"))
+        if exprs.length == 1 then exprs.head
+        else Expr.Tuple(l.asInstanceOf, exprs, r.asInstanceOf)
 
       case id @ Tok.Id(_) =>
         lx.next
@@ -146,7 +148,10 @@ class Parser(source: Source):
           expectEq(lx.next, Tok.Key(")"))
         case Tok.Key(".") =>
           lx.next
-          val field = lx.next.asInstanceOf[Tok.Id]
-          expr = Expr.Field(expr, field)
+          lx.next match
+            case field: Tok.Id =>
+              expr = Expr.Field(expr, field)
+            case num @ Tok.Lit(n: Long) =>
+              expr = Expr.TupleField(expr, num)
 
     expr

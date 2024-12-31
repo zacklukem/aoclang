@@ -38,7 +38,7 @@ private class Scanner(source: Source):
     source.span(start, end)
 
 val KEYWORDS =
-  Set("def", "let", "if", "else", "intrinsic", "(", ")", "{", "}", "[", "]", "=", ":", ",")
+  Set("def", "let", "if", "else", "intrinsic", "(", ")", "{", "}", "[", "]", "=", ":", ",", ".")
 val OPERATOR_CHARS =
   Set('+', '-', '*', '/', '=', '!', '<', '>', '&', '|', '^', '~', '%', '?', ':', '.', ',')
 
@@ -49,13 +49,13 @@ private class LexerInner(source: Source):
 
   def next: Tok =
     sc.next match
-      case Some('(' | ')' | '{' | '}' | '[' | ']' | ',') =>
+      case Some('(' | ')' | '{' | '}' | '[' | ']' | ',' | '.') =>
         Tok.Key(sc.lexeme) withSpan sc.close
 
       case Some('\'') if sc.peek.exists(_.isUnicodeIdentifierStart) =>
         sc.next
         sc.consume(_.isUnicodeIdentifierPart)
-        Tok.Lit(Sym(sc.lexeme)) withSpan sc.close
+        Tok.Lit(Sym(sc.lexeme.substring(1))) withSpan sc.close
 
       case Some(ch) if ch.isWhitespace =>
         sc.consume(_.isWhitespace)

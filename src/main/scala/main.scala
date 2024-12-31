@@ -48,6 +48,6 @@ def main(): Unit =
 
   val interp = Interp(lower.decls.toMap)
 
-  val LowDecl.Def(_, main) = interp.decls(Symbol.Global(List("Fib", "main")))
+  val LowDecl.Def(_, main) = interp.decls(Symbol.Global(List("Lists", "main")))
 
   interp.eval(main)(using Map.empty)

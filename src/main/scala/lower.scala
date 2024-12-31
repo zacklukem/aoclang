@@ -65,7 +65,7 @@ class Lower:
             LowDecl.Intrinsic(name.span.get.text)
           case body: Expr =>
             val tree =
-              LowerExpr(modules("Stl") ++ modules(mod), modules.toMap)
+              LowerExpr(modules("List") ++ modules("Stl") ++ modules(mod), modules.toMap)
                 .lower(body)(Tree.Ret.apply)(using argsBindings)
             LowDecl.Def(argsSym, tree)
 
@@ -75,12 +75,12 @@ class LowerExpr(
     val globals: Map[String, Symbol],
     val modules: Map[String, Map[String, Symbol]]
 ):
-  private def letl(value: LitValue, body: Symbol => Tree, name: String = "_lit"): Tree =
-    val sym = Symbol.local(name)
+  private def letl(value: LitValue)(body: Symbol => Tree): Tree =
+    val sym = Symbol.local
     Tree.LetL(sym, value, body(sym))
 
   private def letlNone(body: Symbol => Tree): Tree =
-    letl(Sym.none, body, "none")
+    letl(Sym.none)(body)
 
   private def letc(args: List[Symbol], value: Tree)(body: Symbol => Tree): Tree =
     val sym = Symbol.local
@@ -115,7 +115,7 @@ class LowerExpr(
         }
 
       case Expr.Lit(Tok.Lit(value)) =>
-        letl(value, c)
+        letl(value)(c)
 
       case Expr.Block(_, body, _) =>
         lower(body)(c)
@@ -141,3 +141,19 @@ class LowerExpr(
 
       case Expr.Var(name) =>
         c(sym.getOrElse(name, globals(name.span.get.text)))
+
+      case Expr.Tuple(_, elems, _) =>
+        lower(elems) { args =>
+          val res = Symbol.local
+          letc(List(res), c(res))(Tree.AppF(Symbol.Global(List("Tuple", "new")), _, args))
+        }
+
+      case Expr.TupleField(tup, Tok.Lit(idx: Long)) =>
+        lower(tup) { tup =>
+          val res = Symbol.local
+          letl(idx) { idx =>
+            letc(List(res), c(res))(
+              Tree.AppF(Symbol.Global(List("Tuple", "get")), _, List(tup, idx))
+            )
+          }
+        }

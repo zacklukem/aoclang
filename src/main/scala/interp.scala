@@ -1,6 +1,7 @@
 package aoclang
 
 enum Value:
+  case Tuple(vs: Array[Value])
   case Lit(v: LitValue)
   case FnRef(v: Symbol.Global)
   case Cnt(args: List[Symbol], body: Tree, env: Map[Symbol, Value])

@@ -37,3 +37,7 @@ enum Expr(span: Span) extends Node(span):
       extends Expr(cond.span ++ elseBranch.getOrElse(thenBranch).span)
 
   case Field(expr: Expr, field: Tok.Id) extends Expr(expr.span ++ field.span.get)
+
+  case TupleField(expr: Expr, field: Tok.Lit) extends Expr(expr.span ++ field.span.get)
+
+  case Tuple(l: Tok.Key, exprs: List[Expr], r: Tok.Key) extends Expr(l.span.get ++ r.span.get)
