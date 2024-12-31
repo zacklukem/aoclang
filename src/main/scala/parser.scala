@@ -67,13 +67,10 @@ class Parser(source: Source):
       case Tok.Key("let") =>
         lx.next
         val pat = parsePat
-        val mut = lx.peek match
-          case tok @ Tok.Key("mut") => Some(tok)
-          case _                    => None
         expectEq(lx.next, Tok.Key("="))
         val rhs = parseSingleExpr
 
-        body => Expr.Let(pat, mut, rhs, body)
+        body => Expr.Let(pat, rhs, body)
 
       case _ =>
         val expr = parseSingleExpr

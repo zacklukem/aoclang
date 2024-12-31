@@ -10,7 +10,7 @@ enum Tok:
   case Key(value: String)
   case Id(value: String)
   case Op(value: String)
-  case Lit(value: LitKind)
+  case Lit(value: LitValue)
   case Eof
 
 private class Scanner(source: Source):

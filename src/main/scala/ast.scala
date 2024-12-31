@@ -2,7 +2,7 @@ package aoclang
 
 class Node(val span: Span)
 
-type LitKind = String | Long | Double | Boolean | Sym
+type LitValue = String | Long | Double | Boolean | Sym
 
 case class TopLevel(decls: List[Decl])
 
@@ -22,7 +22,7 @@ enum Expr(span: Span) extends Node(span):
   case App(fn: Expr, args: List[Expr])
       extends Expr(args.lastOption.map(_.span ++ fn.span).getOrElse(fn.span))
 
-  case Let(binding: Pat, mut: Option[Tok.Key], rhs: Expr, body: Option[Expr])
+  case Let(binding: Pat, rhs: Expr, body: Option[Expr])
       extends Expr(binding.span ++ body.getOrElse(rhs).span)
 
   case Var(name: Tok.Id | Tok.Op) extends Expr(name.span.get)
