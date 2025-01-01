@@ -187,6 +187,13 @@ private def lower_pat(p: Pat, rhs: Symbol)(c: Option[Map[Tok.Id | Tok.Op, Symbol
         } { c(None) }
       }
 
+    case Pat.TypeAssert(pat, Tok.Id(ty)) =>
+      app(ty :@: "is", List(rhs)) { is_of_ty =>
+        iff(is_of_ty) {
+          lower_pat(pat, rhs)(c)
+        } { c(None) }
+      }
+
     case Pat.ListLit(_, pats, _) =>
       def reduce_pats(
           pats: List[Pat],

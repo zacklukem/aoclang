@@ -33,11 +33,11 @@ def has(('set, node), value) = {
   _has(node, hash, value, 7)
 }
 
-def _has(node, hash, value, 0) = {
+def _has(node: List, hash, value, 0) = {
   List.contains(node, value)
 }
 
-def _has(node, hash, value, depth) = {
+def _has(node: Tuple, hash, value, depth) = {
   let idx = hash & 31
 
   match Tuple.get(node, idx) {

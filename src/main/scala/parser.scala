@@ -57,7 +57,7 @@ class Parser(source: Source):
     lhs
 
   def parsePatPrimary: Pat =
-    lx.peek match
+    val pat = lx.peek match
       case Tok.Key("(") =>
         val l = lx.next
         val pats = parsePatList()
@@ -78,6 +78,11 @@ class Parser(source: Source):
       case tok @ Tok.Id(_) =>
         lx.next
         Pat.Bind(tok)
+
+    if lx.peek == Tok.Key(":") then
+      lx.next
+      Pat.TypeAssert(pat, lx.next.asInstanceOf[Tok.Id])
+    else pat
 
   def parseBlockExpr: Expr =
     val l = lx.next
