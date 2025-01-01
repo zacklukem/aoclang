@@ -46,8 +46,6 @@ def main(): Unit =
   moduleAsts.foreach({ case (mod, decls) => lower.declare(mod, decls) })
   moduleAsts.foreach({ case (mod, decls) => lower.lower(mod, decls) })
 
-  lower.decls.toMap.apply("List" :@: "rev_tail").pretty()
-
   val interp = Interp(lower.decls.toMap)
 
   val LowDecl.Def(_, main) = interp.decls(Symbol.Global(List("Lists", "main")))

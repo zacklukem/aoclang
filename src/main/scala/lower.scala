@@ -183,7 +183,7 @@ class Lower:
             assert(decl.size == 1)
 
             val symbol = modules(mod)(name)
-            decls(symbol) = LowDecl.Intrinsic(name)
+            decls(symbol) = LowDecl.Intrinsic(s"$mod.$name")
           case Decl.Def(_, args, _) =>
             val arity = args.length
             val symbol = modules(mod)(name)
@@ -198,7 +198,7 @@ class LowerExpr(
     val modules: Map[String, Map[String, Symbol]]
 ):
   def lowerDeclGroup(decls: List[Decl], arity: Int): LowDecl =
-    val argsSym = (1 to arity).map { idx => Symbol.local(idx.toString) }.toList
+    val argsSym = (1 to arity).map { idx => Symbol.local(s"_arg${idx}_") }.toList
 
     val fail = letl("match error")(Tree.Raise(_))
     val e = decls.foldRight(fail) { case (Decl.Def(_, pat, body: Expr), next) =>
@@ -280,6 +280,12 @@ class LowerExpr(
         lower(elems) { args =>
           val res = Symbol.local
           letc(List(res), c(res))(Tree.AppF("Tuple" :@: "new", _, args))
+        }
+
+      case Expr.ListLit(_, elems, _) =>
+        lower(elems) { args =>
+          val res = Symbol.local
+          letc(List(res), c(res))(Tree.AppF("List" :@: "new", _, args))
         }
 
       case Expr.TupleField(tup, Tok.Lit(idx: Long)) =>

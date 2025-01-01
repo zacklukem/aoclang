@@ -1,4 +1,6 @@
 
+def new(args) = intrinsic
+
 def ::(a, b) = {
   (a, b)
 }

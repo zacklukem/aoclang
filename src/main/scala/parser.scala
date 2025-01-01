@@ -149,19 +149,26 @@ class Parser(source: Source):
       Expr.App(Expr.Var(op), List(rhs))
     else parsePrimaryExpr
 
-  def parseArgList =
+  def parseArgList(terminator: String = ")") =
     val args = mutable.ListBuffer.empty[Expr]
-    while lx.peek != Tok.Key(")") do
+    while lx.peek != Tok.Key(terminator) do
       args += parseSingleExpr
       if lx.peek == Tok.Key(",") then lx.next
-      else expectEq(lx.peek, Tok.Key(")"))
+      else expectEq(lx.peek, Tok.Key(terminator))
     args.toList
 
   def parsePrimaryExpr =
     var expr = lx.peek match
+      case Tok.Key("[") =>
+        val l = lx.next
+        val exprs = parseArgList("]")
+        val r = lx.next
+        expectEq(r, Tok.Key("]"))
+        Expr.ListLit(l.asInstanceOf, exprs, r.asInstanceOf)
+
       case Tok.Key("(") =>
         val l = lx.next
-        val exprs = parseArgList
+        val exprs = parseArgList()
         val r = lx.next
         expectEq(r, Tok.Key(")"))
         if exprs.length == 1 then exprs.head
@@ -179,7 +186,7 @@ class Parser(source: Source):
       lx.peek match
         case Tok.Key("(") =>
           lx.next
-          val args = parseArgList
+          val args = parseArgList()
           expr = Expr.App(expr, args)
           expectEq(lx.next, Tok.Key(")"))
         case Tok.Key(".") =>
