@@ -15,15 +15,13 @@ class Parser(source: Source):
     while lx.peek != Tok.Eof do decls += parseDecl
     decls.toList
 
-  def parseDeclArgList =
-    expectEq(lx.next, Tok.Key("("))
+  def parseDeclArgList(terminator: Tok = Tok.Key(")")) =
     val args = mutable.ListBuffer.empty[Pat]
-    while lx.peek != Tok.Key(")") do
+    while lx.peek != terminator do
       val name = parsePat
       args += name
       if lx.peek == Tok.Key(",") then lx.next
-      else expectEq(lx.peek, Tok.Key(")"))
-    expectEq(lx.next, Tok.Key(")"))
+      else expectEq(lx.peek, terminator)
     args.toList
 
   def parseDecl =
@@ -31,13 +29,16 @@ class Parser(source: Source):
       case Tok.Key("def") =>
         lx.next
         val name = lx.next.asInstanceOf[Tok.Id | Tok.Op]
-        val args = parseDeclArgList
+        expectEq(lx.next, Tok.Key("("))
+        val args = parseDeclArgList()
+        expectEq(lx.next, Tok.Key(")"))
         expectEq(lx.next, Tok.Key("="))
         val body: Expr | Intrinsic =
           if lx.peek == Tok.Key("intrinsic") then Intrinsic(lx.next.span.get)
           else parseSingleExpr
 
         Decl.Def(name, args, body)
+      case tok => emit(tok.span.get, s"Unexpected: $tok")
 
   def parsePatList(terminator: String = ")"): List[Pat] =
     val args = mutable.ListBuffer.empty[Pat]
@@ -122,6 +123,14 @@ class Parser(source: Source):
     lx.peek match
       case Tok.Key("{") => parseBlockExpr
 
+      case Tok.Op("/") =>
+        val l = lx.next
+        val args = parseDeclArgList(Tok.Op("/"))
+        val r = lx.next
+        expectEq(r, Tok.Op("/"))
+        val body = parseSingleExpr
+        Expr.Lambda(l.asInstanceOf, args, r.asInstanceOf, body)
+
       case Tok.Key("match") =>
         val l = lx.next
         val expr = parseSingleExpr
@@ -202,6 +211,8 @@ class Parser(source: Source):
       case lit @ Tok.Lit(_) =>
         lx.next
         Expr.Lit(lit)
+
+      case tok => emit(tok.span.get, s"Unexpected: $tok")
 
     while (lx.peek == Tok.Key("(") && !lx.peek.span.get.isAfterNewline) || lx.peek == Tok.Key(".")
     do

@@ -22,10 +22,8 @@ def test_reverse() = {
   assert(rev([0, 1, 2, 3]) == [3, 2, 1, 0])
 }
 
-def add1(x) = x + 1
-
 def test_map() = {
-  assert(map([], add1) == [])
-  assert(map([0], add1) == [1])
-  assert(map([0, 1], add1) == [1, 2])
+  assert(map([], /x/ x + 1) == [])
+  assert(map([0], /x/ x + 1) == [1])
+  assert(map([0, 1], /x/ x + 1) == [1, 2])
 }

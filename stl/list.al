@@ -6,38 +6,36 @@ def is_empty(list) = intrinsic
 def to_tuple(list) = intrinsic
 def ::(a, b) = intrinsic
 
-def len([]) = 0
-def len(h :: tail) = {
-  1 + len(tail)
-}
+def len(arr) = _len(arr, 0)
 
-def range(a, b) = {
-  if a >= b {
-    []
+def _len([], acc) = acc
+def _len(h :: tail, acc) = _len(tail, acc + 1)
+
+def range(a, b) = _range(a, b - 1, [])
+
+def _range(a, b, acc) = {
+  if b < a {
+    acc
   } else {
-    a :: range(a + 1, b)
+    _range(a, b - 1, b :: acc)
   }
 }
 
-def foreach(a, f) = {
-  if a != [] {
-    let head :: tail = a
-    f(head)
-    foreach(tail, f)
-  }
+def foreach([], f) = 'none
+def foreach(head :: tail, f) = {
+  f(head)
+  foreach(tail, f)
 }
 
-def rev_tail([], acc) = acc
-def rev_tail(head :: tail, acc) = rev_tail(tail, head :: acc)
+def _rev([], acc) = acc
+def _rev(head :: tail, acc) = _rev(tail, head :: acc)
 
-def rev(list) = rev_tail(list, [])
+def rev(list) = _rev(list, [])
 
-def map(a, f) = {
-  match a {
-    [] => [],
-    head :: tail => f(head) :: map(tail, f),
-  }
-}
+def map(a, f) = rev(_map(a, f, []))
+
+def _map([], f, acc) = acc
+def _map(head :: tail, f, acc) = _map(tail, f, f(head) :: acc)
 
 # TODO: replace with true/false literals
 def contains([], v) = 0 == 1

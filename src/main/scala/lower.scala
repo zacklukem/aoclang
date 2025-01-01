@@ -26,6 +26,7 @@ enum Tree:
   case AppF(fn: Symbol, retC: Symbol, args: List[Symbol])
   case AppC(fn: Symbol, args: List[Symbol])
   case LetC(name: Symbol, args: List[Symbol], value: Tree, body: Tree)
+  case LetF(name: Symbol, args: List[Symbol], value: Tree, body: Tree)
   case LetL(name: Symbol, value: LitValue, body: Tree)
   case If(cond: Symbol, thenC: Symbol, elseC: Symbol)
   case Raise(value: Symbol)
@@ -40,6 +41,11 @@ enum Tree:
         line(s"appc ${fn}(${args.mkString(",")})")
       case Tree.LetC(name, args, value, body) =>
         line(s"letc ${name}(${args.mkString(",")}) = {")
+        value.pretty(depth + 1)
+        line("}")
+        body.pretty(depth)
+      case LetF(name, args, value, body) =>
+        line(s"letf ${name}(${args.mkString(",")}) = {")
         value.pretty(depth + 1)
         line("}")
         body.pretty(depth)
@@ -384,6 +390,21 @@ class LowerExpr(
           }
         }
 
+      case Expr.Lambda(_, args, _, body) =>
+        val name = Symbol.local
+        val argSyms = args.map { _ => Symbol.local }
+        Tree.LetF(
+          name,
+          argSyms,
+          lower_pat_product(args.zip(argSyms)) {
+            case Some(bindings) =>
+              lower_tail(body)(Symbol.Ret)(using sym ++ bindings)
+            case None =>
+              letl("match error")(Tree.Raise(_))
+          },
+          c(name)
+        )
+
   def lower_tail(e: Option[Expr])(c: Symbol)(using sym: Map[Tok.Id | Tok.Op, Symbol]): Tree =
     e
       .map(lower_tail(_)(c))
@@ -467,3 +488,18 @@ class LowerExpr(
             }
           }
         }
+
+      case Expr.Lambda(_, args, _, body) =>
+        val name = Symbol.local
+        val argSyms = args.map { _ => Symbol.local }
+        Tree.LetF(
+          name,
+          argSyms,
+          lower_pat_product(args.zip(argSyms)) {
+            case Some(bindings) =>
+              lower_tail(body)(Symbol.Ret)(using sym ++ bindings)
+            case None =>
+              letl("match error")(Tree.Raise(_))
+          },
+          cf(name)
+        )

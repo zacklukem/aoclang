@@ -26,6 +26,9 @@ enum Pat(span: Span) extends Node(span):
 case class MatchCase(pat: Pat, body: Expr)
 
 enum Expr(span: Span) extends Node(span):
+  case Lambda(l: Tok.Op, args: List[Pat], r: Tok.Op, body: Expr)
+      extends Expr(l.span.get ++ body.span)
+
   case App(fn: Expr, args: List[Expr])
       extends Expr(args.lastOption.map(_.span ++ fn.span).getOrElse(fn.span))
 

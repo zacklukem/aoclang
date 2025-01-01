@@ -75,6 +75,9 @@ private class LexerInner(source: Source):
         sc.close
         next
 
+      case Some('/') if sc.peek.contains('/') =>
+        Tok.Op(sc.lexeme) withSpan sc.close
+
       case Some('(' | ')' | '{' | '}' | '[' | ']' | ',' | '.') =>
         Tok.Key(sc.lexeme) withSpan sc.close
 

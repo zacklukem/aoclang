@@ -7,6 +7,7 @@ enum Value:
   case ListVal(vs: List[Value])
   case Lit(v: LitValue)
   case FnRef(v: Symbol.Global)
+  case Closure(args: List[Symbol], body: Tree, env: Map[Symbol, Value])
   case Cnt(args: List[Symbol], body: Tree, env: Map[Symbol, Value])
 
 class Interp(val decls: Map[Symbol, LowDecl]):
@@ -36,22 +37,32 @@ class Interp(val decls: Map[Symbol, LowDecl]):
 
     e match
       case Tree.AppF(fn, Symbol.Ret, args) =>
-        deepDecl(fn) match
-          case LowDecl.Def(argSyms, tree) =>
+         env.get(fn) match
+          case Some(Value.Closure(argSyms, tree, env)) =>
             val fenv = argSyms.zip(args.map(genv)).toMap
-            eval(tree)(using fenv, fn :: stack)
-          case LowDecl.Intrinsic(f) =>
-            try INTRINSICS(f)(args.map(genv))
-            catch case Xcept(msg) => throw XceptWithStack(msg, stack)
+            eval(tree)(using fenv ++ env, fn :: stack)
+          case _ =>
+            deepDecl(fn) match
+              case LowDecl.Def(argSyms, tree) =>
+                val fenv = argSyms.zip(args.map(genv)).toMap
+                eval(tree)(using fenv, fn :: stack)
+              case LowDecl.Intrinsic(f) =>
+                try INTRINSICS(f)(args.map(genv))
+                catch case Xcept(msg) => throw XceptWithStack(msg, stack)
 
       case Tree.AppF(fn, retC, args) =>
-        val res = deepDecl(fn) match
-          case LowDecl.Def(argSyms, tree) =>
+        val res = env.get(fn) match
+          case Some(Value.Closure(argSyms, tree, env)) =>
             val fenv = argSyms.zip(args.map(genv)).toMap
-            evalNonTail(tree)(using fenv, fn :: stack)
-          case LowDecl.Intrinsic(f) =>
-            try INTRINSICS(f)(args.map(genv))
-            catch case Xcept(msg) => throw XceptWithStack(msg, stack)
+            evalNonTail(tree)(using fenv ++ env, fn :: stack)
+          case _ =>
+            deepDecl(fn) match
+              case LowDecl.Def(argSyms, tree) =>
+                val fenv = argSyms.zip(args.map(genv)).toMap
+                evalNonTail(tree)(using fenv, fn :: stack)
+              case LowDecl.Intrinsic(f) =>
+                try INTRINSICS(f)(args.map(genv))
+                catch case Xcept(msg) => throw XceptWithStack(msg, stack)
 
         if retC == Symbol.Ret then res
         else
@@ -67,6 +78,10 @@ class Interp(val decls: Map[Symbol, LowDecl]):
 
       case Tree.LetC(name, args, value, body) =>
         val cnt = Value.Cnt(args, value, env)
+        eval(body)(using env + (name -> cnt))
+
+      case Tree.LetF(name, args, value, body) =>
+        val cnt = Value.Closure(args, value, env)
         eval(body)(using env + (name -> cnt))
 
       case Tree.LetL(name, value, body) =>
