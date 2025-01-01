@@ -113,7 +113,7 @@ def applyAll[T](x: Seq[T])(f: (T, Symbol => Tree) => Tree)(c: List[Symbol] => Tr
         }
       )
 
-private def lower_pat(p: Pat, rhs: Symbol)(c: Option[Map[Tok.Id | Tok.Op, Symbol]] => Tree) =
+private def lower_pat(p: Pat, rhs: Symbol)(c: Option[Map[Tok.Id | Tok.Op, Symbol]] => Tree): Tree =
   p match
     case Pat.Bind(binding) =>
       c(Some(Map(binding -> rhs)))
@@ -123,9 +123,7 @@ private def lower_pat(p: Pat, rhs: Symbol)(c: Option[Map[Tok.Id | Tok.Op, Symbol
         app("Stl" :@: "==", List(rhs, lit)) { is_eq =>
           iff(is_eq) {
             c(Some(Map.empty))
-          } {
-            c(None)
-          }
+          } { c(None) }
         }
       }
 
@@ -151,9 +149,68 @@ private def lower_pat(p: Pat, rhs: Symbol)(c: Option[Map[Tok.Id | Tok.Op, Symbol
               }
             }
           }
-        } {
-          c(None)
-        }
+        } { c(None) }
+      }
+
+    case Pat.Cons(head, tail) =>
+      app("List" :@: "is", List(rhs)) { is_list =>
+        iff(is_list) {
+          app("List" :@: "head", List(rhs)) { headVal =>
+            letl(Sym.none) { nonel =>
+              app("Stl" :@: "!=", List(headVal, nonel)) { head_is_some =>
+                iff(head_is_some) {
+                  lower_pat(head, headVal) {
+                    case Some(head_bindings) =>
+                      app("List" :@: "tail", List(rhs)) { tailVal =>
+                        lower_pat(tail, tailVal) {
+                          case Some(tail_bindings) => c(Some(head_bindings ++ tail_bindings))
+                          case None                => c(None)
+                        }
+                      }
+                    case None => c(None)
+                  }
+                } { c(None) }
+              }
+            }
+          }
+        } { c(None) }
+      }
+
+    case Pat.ListLit(_, Nil, _) =>
+      app("List" :@: "is", List(rhs)) { is_list =>
+        iff(is_list) {
+          app("List" :@: "is_empty", List(rhs)) { is_empty =>
+            iff(is_empty) {
+              c(Some(Map.empty))
+            } { c(None) }
+          }
+        } { c(None) }
+      }
+
+    case Pat.ListLit(_, pats, _) =>
+      def reduce_pats(
+          pats: List[Pat],
+          prev: Symbol,
+          bindings: Map[Tok.Id | Tok.Op, Symbol]
+      ): Tree =
+        pats match
+          case Nil =>
+            c(Some(bindings))
+          case pat :: tail =>
+            app("List" :@: "head", List(prev)) { head =>
+              lower_pat(pat, head) {
+                case Some(head_bindings) =>
+                  app("List" :@: "tail", List(prev)) { tailVal =>
+                    reduce_pats(tail, tailVal, bindings ++ head_bindings)
+                  }
+                case None => c(None)
+              }
+            }
+
+      app("List" :@: "is", List(rhs)) { is_list =>
+        iff(is_list) {
+          reduce_pats(pats, rhs, Map.empty)
+        } { c(None) }
       }
 
 class Lower:
@@ -370,8 +427,7 @@ class LowerExpr(
 
       case Expr.Tuple(_, elems, _) =>
         lower(elems) { args =>
-          val res = Symbol.local
-          letc(List(res), cf(res))(Tree.AppF("Tuple" :@: "new", _, args))
+          Tree.AppF("Tuple" :@: "new", c, args)
         }
 
       case Expr.TupleField(tup, Tok.Lit(idx: Long)) =>
@@ -379,6 +435,11 @@ class LowerExpr(
           letl(idx) { idx =>
             Tree.AppF("Tuple" :@: "get", c, List(tup, idx))
           }
+        }
+
+      case Expr.ListLit(_, elems, _) =>
+        lower(elems) { args =>
+          Tree.AppF("List" :@: "new", c, args)
         }
 
       case Expr.Match(expr, _, cases, _) =>

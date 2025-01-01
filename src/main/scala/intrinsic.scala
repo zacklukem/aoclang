@@ -1,10 +1,14 @@
 package aoclang
 
-def xcept(str: String): Nothing = throw new Exception(str)
+case class Xcept(msg: String) extends Exception(msg)
+case class XceptWithStack(msg: String, stack: List[Symbol]) extends Exception(msg)
+
+def xcept(str: String): Nothing = throw Xcept(str)
 
 def intrinsicToString(v: Value): String =
   v match
     case Value.Lit(v)     => v.toString
+    case Value.ListVal(l) => l.map(intrinsicToString).mkString("[", ", ", "]")
     case Value.FnRef(ref) => s"<$ref>"
     case Value.Tuple(tup) => tup.map(intrinsicToString).mkString("(", ", ", ")")
 
@@ -14,15 +18,36 @@ val INTRINSICS = Map[String, List[Value] => Value](
     Value.Lit(Sym.none)
   },
   "List.new" -> { args =>
-    args.foldRight(Value.Lit(Sym.nil)) { case (a, b) =>
-      Value.Tuple(Array(a, b))
-    }
+    Value.ListVal(args)
+  },
+  "List.::" -> {
+    case List(head, Value.ListVal(tail)) => Value.ListVal(head :: tail)
+    case _                               => xcept("Invalid types for (::)")
+  },
+  "List.head" -> {
+    case List(Value.ListVal(head :: _)) => head
+    case List(Value.ListVal(Nil))       => Value.Lit(Sym.none)
+    case _                              => xcept("Invalid types for (List.head)")
+  },
+  "List.tail" -> {
+    case List(Value.ListVal(_ :: tail)) => Value.ListVal(tail)
+    case List(Value.ListVal(Nil))       => Value.Lit(Sym.none)
+    case _                              => xcept("Invalid types for (List.tail)")
+  },
+  "List.is" -> {
+    case List(Value.ListVal(_)) => Value.Lit(true)
+    case _                      => Value.Lit(false)
+  },
+  "List.is_empty" -> {
+    case List(Value.ListVal(Nil)) => Value.Lit(true)
+    case _                        => Value.Lit(false)
   },
   "Tuple.new" -> { args =>
     Value.Tuple(args.toArray)
   },
-  "Tuple.get" -> { case List(Value.Tuple(tup), Value.Lit(idx: Long)) =>
-    tup(idx.toInt)
+  "Tuple.get" -> {
+    case List(Value.Tuple(tup), Value.Lit(idx: Long)) => tup(idx.toInt)
+    case _                                            => xcept("Invalid types for (Tuple.get)")
   },
   "Tuple.is" -> {
     case List(Value.Tuple(_)) => Value.Lit(true)

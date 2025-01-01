@@ -39,23 +39,39 @@ class Parser(source: Source):
 
         Decl.Def(name, args, body)
 
-  def parsePatList: List[Pat] =
+  def parsePatList(terminator: String = ")"): List[Pat] =
     val args = mutable.ListBuffer.empty[Pat]
-    while lx.peek != Tok.Key(")") do
+    while lx.peek != Tok.Key(terminator) do
       args += parsePat
       if lx.peek == Tok.Key(",") then lx.next
-      else expectEq(lx.peek, Tok.Key(")"))
+      else expectEq(lx.peek, Tok.Key(terminator))
     args.toList
 
-  def parsePat: Pat =
+  def parsePat =
+    // TODO: Implement operator precedence
+    var lhs = parsePatPrimary
+    while lx.peek == Tok.Op("::") do
+      lx.next
+      val rhs = parsePatPrimary
+      lhs = Pat.Cons(lhs, rhs)
+    lhs
+
+  def parsePatPrimary: Pat =
     lx.peek match
       case Tok.Key("(") =>
         val l = lx.next
-        val pats = parsePatList
+        val pats = parsePatList()
         val r = lx.next
         expectEq(r, Tok.Key(")"))
         if pats.length == 1 then pats.head
         else Pat.Tuple(l.asInstanceOf, pats, r.asInstanceOf)
+      case Tok.Key("[") =>
+        val l = lx.next
+        val pats = parsePatList("]")
+        val r = lx.next
+        expectEq(r, Tok.Key("]"))
+        if pats.length == 1 then pats.head
+        else Pat.ListLit(l.asInstanceOf, pats, r.asInstanceOf)
       case lit: Tok.Lit =>
         lx.next
         Pat.Lit(lit)

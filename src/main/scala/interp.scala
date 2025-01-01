@@ -4,15 +4,17 @@ import scala.annotation.tailrec
 
 enum Value:
   case Tuple(vs: Array[Value])
+  case ListVal(vs: List[Value])
   case Lit(v: LitValue)
   case FnRef(v: Symbol.Global)
   case Cnt(args: List[Symbol], body: Tree, env: Map[Symbol, Value])
 
 class Interp(val decls: Map[Symbol, LowDecl]):
-  private def evalNonTail(e: Tree)(using env: Map[Symbol, Value]): Value = eval(e)
+  private def evalNonTail(e: Tree)(using env: Map[Symbol, Value], stack: List[Symbol]): Value =
+    eval(e)
 
   @tailrec
-  final def eval(e: Tree)(using env: Map[Symbol, Value]): Value =
+  final def eval(e: Tree)(using env: Map[Symbol, Value], stack: List[Symbol]): Value =
     def deepDecl(s: Symbol): LowDecl = decls.get(s) match
       case Some(d) => d
       case None =>
@@ -37,17 +39,19 @@ class Interp(val decls: Map[Symbol, LowDecl]):
         deepDecl(fn) match
           case LowDecl.Def(argSyms, tree) =>
             val fenv = argSyms.zip(args.map(genv)).toMap
-            eval(tree)(using fenv)
+            eval(tree)(using fenv, fn :: stack)
           case LowDecl.Intrinsic(f) =>
-            INTRINSICS(f)(args.map(genv))
+            try INTRINSICS(f)(args.map(genv))
+            catch case Xcept(msg) => throw XceptWithStack(msg, stack)
 
       case Tree.AppF(fn, retC, args) =>
         val res = deepDecl(fn) match
           case LowDecl.Def(argSyms, tree) =>
             val fenv = argSyms.zip(args.map(genv)).toMap
-            evalNonTail(tree)(using fenv)
+            evalNonTail(tree)(using fenv, fn :: stack)
           case LowDecl.Intrinsic(f) =>
-            INTRINSICS(f)(args.map(genv))
+            try INTRINSICS(f)(args.map(genv))
+            catch case Xcept(msg) => throw XceptWithStack(msg, stack)
 
         if retC == Symbol.Ret then res
         else
@@ -79,4 +83,5 @@ class Interp(val decls: Map[Symbol, LowDecl]):
           eval(body)(using fenvp)
 
       case Tree.Raise(v) =>
-        throw new Exception(s"raised: ${genv(v)}")
+        try xcept(s"raised: ${genv(v)}")
+        catch case Xcept(msg) => throw XceptWithStack(msg, stack)

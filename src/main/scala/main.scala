@@ -48,10 +48,18 @@ def main(): Unit =
 
   val interp = Interp(lower.decls.toMap)
 
-  val LowDecl.Def(_, main) = interp.decls(Symbol.Global(List("Lists", "main")))
+  val mainfn = "Lists" :@: "main"
+
+  val LowDecl.Def(_, main) = interp.decls(mainfn)
 
   val start = System.nanoTime
-  interp.eval(main)(using Map.empty)
+  try interp.eval(main)(using Map.empty, List(mainfn))
+  catch
+    case XceptWithStack(msg, stack) =>
+      println(s"ERROR: $msg")
+      stack.foreach { frame =>
+        println(s"\t$frame")
+      }
   val time = (System.nanoTime - start) / 1e6
 
   println(s"Execution time: $time ms")

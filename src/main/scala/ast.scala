@@ -19,6 +19,8 @@ enum Pat(span: Span) extends Node(span):
   case Bind(name: Tok.Id) extends Pat(name.span.get)
   case Tuple(l: Tok.Key, pats: List[Pat], r: Tok.Key) extends Pat(l.span.get ++ r.span.get)
   case Lit(value: Tok.Lit) extends Pat(value.span.get)
+  case Cons(head: Pat, tail: Pat) extends Pat(head.span ++ tail.span)
+  case ListLit(l: Tok.Key, pats: List[Pat], r: Tok.Key) extends Pat(l.span.get ++ r.span.get)
 
 case class MatchCase(pat: Pat, body: Expr)
 
