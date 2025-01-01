@@ -7,15 +7,23 @@ def xcept(str: String): Nothing = throw Xcept(str)
 
 def intrinsicToString(v: Value): String =
   v match
-    case Value.Lit(v)     => v.toString
-    case Value.ListVal(l) => l.map(intrinsicToString).mkString("[", ", ", "]")
-    case Value.FnRef(ref) => s"<$ref>"
-    case Value.Tuple(tup) => tup.map(intrinsicToString).mkString("(", ", ", ")")
+    case Value.Lit(v)       => v.toString
+    case Value.ListVal(l)   => l.map(intrinsicToString).mkString("[", ", ", "]")
+    case Value.FnRef(ref)   => s"<$ref>"
+    case Value.Tuple(tup)   => tup.map(intrinsicToString).mkString("(", ", ", ")")
+    case Value.Cnt(_, _, _) => s"<cnt>"
 
 val INTRINSICS = Map[String, List[Value] => Value](
-  "Stl.println" -> { case List(a) =>
-    println(intrinsicToString(a))
-    Value.Lit(Sym.none)
+  "Stl.println" -> {
+    case List(a) =>
+      println(intrinsicToString(a))
+      Value.Lit(Sym.none)
+    case _ => xcept("Invalid args for (Stl.println)")
+  },
+  "Stl.assert" -> {
+    case List(Value.Lit(true))  => Value.Lit(Sym.none)
+    case List(Value.Lit(false)) => xcept("Assertion failed")
+    case _                      => xcept("Invalid types for (Stl.assert)")
   },
   "List.new" -> { args =>
     Value.ListVal(args)
@@ -156,6 +164,6 @@ val INTRINSICS = Map[String, List[Value] => Value](
   },
   "Stl.++" -> {
     case List(a, b) => Value.Lit(s"${intrinsicToString(a)}${intrinsicToString(b)}")
-    case List(a, b) => xcept(s"Invalid types for (++): $a $b")
+    case _          => xcept(s"Invalid types for (++)")
   }
 )

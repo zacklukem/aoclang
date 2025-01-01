@@ -26,6 +26,11 @@ def print_tree(obj: Any, depth: Int = 0, paramName: Option[String] = None): Unit
 def pascalCase(s: String) =
   s.split("_").map(_.capitalize).mkString
 
+def isTest(s: Symbol) =
+  s match
+    case Symbol.Global(List(mod, fn)) => mod.startsWith("Test") && fn.startsWith("test_")
+    case _                            => false
+
 @main
 def main(): Unit =
   val stl_root = Path.of("stl")
@@ -48,18 +53,19 @@ def main(): Unit =
 
   val interp = Interp(lower.decls.toMap)
 
-  val mainfn = "Lists" :@: "main"
-
-  val LowDecl.Def(_, main) = interp.decls(mainfn)
-
-  val start = System.nanoTime
-  try interp.eval(main)(using Map.empty, List(mainfn))
-  catch
-    case XceptWithStack(msg, stack) =>
-      println(s"ERROR: $msg")
-      stack.foreach { frame =>
-        println(s"\t$frame")
-      }
-  val time = (System.nanoTime - start) / 1e6
-
-  println(s"Execution time: $time ms")
+  lower.decls.foreach { case (name, decl) =>
+    if isTest(name) then
+      print(s"\u001b[34mTEST $name... \u001b[0m")
+      val LowDecl.Def(_, body) = decl
+      try
+        val start = System.nanoTime
+        interp.eval(body)(using Map.empty, List(name))
+        val time = (System.nanoTime - start) / 1e6
+        println(s"\u001b[32mPASS ($time ms)\u001b[0m")
+      catch
+        case XceptWithStack(msg, stack) =>
+          println(s"\u001b[31mERROR: $msg\u001b[0m")
+          stack.foreach { frame =>
+            println(s"\u001b[31m\t$frame\u001b[0m")
+          }
+  }

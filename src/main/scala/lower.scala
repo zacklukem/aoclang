@@ -10,7 +10,7 @@ enum Symbol:
   override def toString: String =
     this match
       case Symbol.Local(id)    => id
-      case Symbol.Global(name) => s":${name.mkString(".")}"
+      case Symbol.Global(name) => s"${name.mkString(".")}"
       case Ret                 => "@ret"
 
 object Symbol:
