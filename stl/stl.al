@@ -42,6 +42,6 @@ def >>(a, b) = intrinsic
 
 def ++(a, b) = intrinsic
 
-def |>(a, f) = f(a)
-
 def !(a) = intrinsic
+
+def |>(a, f) = f(a)
