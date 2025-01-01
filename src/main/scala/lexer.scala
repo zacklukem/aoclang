@@ -61,7 +61,9 @@ val KEYWORDS =
 val OPERATOR_CHARS =
   Set('+', '-', '*', '/', '=', '!', '<', '>', '&', '|', '^', '~', '%', '?', ':', '.', ',')
 
-extension (c: Char) private def isOperator: Boolean = OPERATOR_CHARS.contains(c)
+extension (c: Char)
+  private def isOperator: Boolean = OPERATOR_CHARS.contains(c)
+  private def isIdentStart: Boolean = c.isUnicodeIdentifierStart || c == '_'
 
 private class LexerInner(source: Source):
   private val sc = Scanner(source)
@@ -76,7 +78,7 @@ private class LexerInner(source: Source):
       case Some('(' | ')' | '{' | '}' | '[' | ']' | ',' | '.') =>
         Tok.Key(sc.lexeme) withSpan sc.close
 
-      case Some('\'') if sc.peek.exists(_.isUnicodeIdentifierStart) =>
+      case Some('\'') if sc.peek.exists(_.isIdentStart) =>
         sc.next
         sc.consume(_.isUnicodeIdentifierPart)
         Tok.Lit(Sym(sc.lexeme.substring(1))) withSpan sc.close
@@ -92,7 +94,7 @@ private class LexerInner(source: Source):
         if KEYWORDS.contains(lexeme) then Tok.Key(lexeme) withSpan sc.close
         else Tok.Op(lexeme) withSpan sc.close
 
-      case Some(ch) if ch.isUnicodeIdentifierStart =>
+      case Some(ch) if ch.isIdentStart =>
         sc.consume(_.isUnicodeIdentifierPart)
         val lexeme = sc.lexeme
         if KEYWORDS.contains(lexeme) then Tok.Key(lexeme) withSpan sc.close
@@ -112,6 +114,8 @@ private class LexerInner(source: Source):
         val contents = sc.lexeme.substring(1)
         sc.next
         Tok.Lit(contents) withSpan sc.close
+
+      case Some(ch) => throw RuntimeException(s"unexpected character: $ch")
 
       case None => Tok.Eof
 

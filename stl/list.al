@@ -3,6 +3,7 @@ def head(list) = intrinsic
 def tail(list) = intrinsic
 def is(list) = intrinsic
 def is_empty(list) = intrinsic
+def to_tuple(list) = intrinsic
 def ::(a, b) = intrinsic
 
 def len([]) = 0
@@ -35,5 +36,15 @@ def map(a, f) = {
   match a {
     [] => [],
     head :: tail => f(head) :: map(tail, f),
+  }
+}
+
+# TODO: replace with true/false literals
+def contains([], v) = 0 == 1
+def contains(v :: tail, expected) = {
+  if v == expected {
+    0 == 0
+  } else {
+    contains(tail, expected)
   }
 }

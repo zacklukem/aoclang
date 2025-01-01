@@ -1,5 +1,7 @@
 package aoclang
 
+import java.nio.file.{Files, Path}
+
 case class Xcept(msg: String) extends Exception(msg)
 case class XceptWithStack(msg: String, stack: List[Symbol]) extends Exception(msg)
 
@@ -24,6 +26,35 @@ val INTRINSICS = Map[String, List[Value] => Value](
     case List(Value.Lit(true))  => Value.Lit(Sym.none)
     case List(Value.Lit(false)) => xcept("Assertion failed")
     case _                      => xcept("Invalid types for (Stl.assert)")
+  },
+  "Stl.hash_code" -> {
+    case List(x) => Value.Lit(x.hashCode.toLong)
+    case _       => xcept("Invalid types for (Stl.hash_code)")
+  },
+  "File.read_string" -> {
+    case List(Value.Lit(path: String)) =>
+      try
+        val s = Files.readString(Path.of(path))
+        Value.Lit(s)
+      catch case e => xcept(s"Failed to read file")
+    case _ => xcept("Invalid types for (File.read_string)")
+  },
+  "String.chars" -> {
+    case List(Value.Lit(s: String)) => Value.ListVal(s.toList.map(_.toLong |> Value.Lit.apply))
+    case _                          => xcept("Invalid types for (String.chars)")
+  },
+  "String.size" -> {
+    case List(Value.Lit(s: String)) => Value.Lit(s.length.toLong)
+    case _                          => xcept("Invalid types for (String.size)")
+  },
+  "String.from_chars" -> {
+    case List(Value.ListVal(chars)) =>
+      chars.map {
+        case Value.Lit(c: Long) => c.toChar
+        case _                  => xcept("Invalid types for (String.from_chars)")
+      }.mkString
+        |> Value.Lit.apply
+    case _ => xcept("Invalid types for (String.from_chars)")
   },
   "List.new" -> { args =>
     Value.ListVal(args)
@@ -50,6 +81,10 @@ val INTRINSICS = Map[String, List[Value] => Value](
     case List(Value.ListVal(Nil)) => Value.Lit(true)
     case _                        => Value.Lit(false)
   },
+  "List.to_tuple" -> {
+    case List(Value.ListVal(l)) => Value.Tuple(l.toArray)
+    case _                      => xcept("Invalid types for (List.to_tuple)")
+  },
   "Tuple.new" -> { args =>
     Value.Tuple(args.toArray)
   },
@@ -64,6 +99,17 @@ val INTRINSICS = Map[String, List[Value] => Value](
   "Tuple.size" -> {
     case List(Value.Tuple(tup)) => Value.Lit(tup.length.toLong)
     case _                      => xcept("Invalid types for (Tuple.size)")
+  },
+  "Tuple.put" -> {
+    case List(Value.Tuple(tup), Value.Lit(idx: Long), v) =>
+      val idxInt = idx.toInt
+      val newTup = tup.updated(idxInt, v)
+      Value.Tuple(newTup)
+    case _ => xcept("Invalid types for (Tuple.put)")
+  },
+  "Stl.!" -> {
+    case List(Value.Lit(x: Boolean)) => Value.Lit(!x)
+    case _                           => xcept("Invalid types for (!)")
   },
   "Stl.==" -> { case List(a, b) => Value.Lit(a == b) },
   "Stl.!=" -> { case List(a, b) => Value.Lit(a != b) },

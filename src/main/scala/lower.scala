@@ -213,6 +213,10 @@ private def lower_pat(p: Pat, rhs: Symbol)(c: Option[Map[Tok.Id | Tok.Op, Symbol
         } { c(None) }
       }
 
+def emit(span: Span, e: String) =
+  span.printLineColumn("error")
+  throw new Exception(e)
+
 class Lower:
   val modules: mutable.Map[String, Map[String, Symbol]] = mutable.Map()
   val decls: mutable.Map[Symbol, LowDecl] = mutable.Map()
@@ -258,7 +262,7 @@ class LowerExpr(
     val argsSym = (1 to arity).map { idx => Symbol.local(s"_arg${idx}_") }.toList
 
     val fail = letl("match error")(Tree.Raise(_))
-    val e = decls.foldRight(fail) { case (Decl.Def(_, pat, body: Expr), next) =>
+    val e = decls.foldRight(fail) { case (Decl.Def(name, pat, body: Expr), next) =>
       lower_pat_product(pat.zip(argsSym)) {
         case Some(bindings) =>
           lower_tail(body)(Symbol.Ret)(using bindings)
@@ -331,7 +335,9 @@ class LowerExpr(
         c(modules(name)(field))
 
       case Expr.Var(name) =>
-        c(sym.getOrElse(name, globals(name.span.get.text)))
+        sym.get(name).orElse(globals.get(name.span.get.text)) match
+          case Some(s) => c(s)
+          case None    => emit(name.span.get, s"undefined variable ${name.span.get.text}")
 
       case Expr.Tuple(_, elems, _) =>
         lower(elems) { args =>

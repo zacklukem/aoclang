@@ -182,7 +182,7 @@ class Parser(source: Source):
         expectEq(r, Tok.Key("]"))
         Expr.ListLit(l.asInstanceOf, exprs, r.asInstanceOf)
 
-      case Tok.Key("(") =>
+      case tok @ Tok.Key("(") =>
         val l = lx.next
         val exprs = parseArgList()
         val r = lx.next
@@ -198,7 +198,8 @@ class Parser(source: Source):
         lx.next
         Expr.Lit(lit)
 
-    while lx.peek == Tok.Key("(") || lx.peek == Tok.Key(".") do
+    while (lx.peek == Tok.Key("(") && !lx.peek.span.get.isAfterNewline) || lx.peek == Tok.Key(".")
+    do
       lx.peek match
         case Tok.Key("(") =>
           lx.next

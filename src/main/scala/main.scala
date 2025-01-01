@@ -55,7 +55,7 @@ def main(): Unit =
 
   lower.decls.foreach { case (name, decl) =>
     if isTest(name) then
-      print(s"\u001b[34mTEST $name... \u001b[0m")
+      print(s"\u001b[34mTEST $name... \u001b[0m".padTo(60, ' '))
       val LowDecl.Def(_, body) = decl
       try
         val start = System.nanoTime
@@ -64,8 +64,8 @@ def main(): Unit =
         println(s"\u001b[32mPASS ($time ms)\u001b[0m")
       catch
         case XceptWithStack(msg, stack) =>
-          println(s"\u001b[31mERROR: $msg\u001b[0m")
+          println(s"\n\u001b[31m\tERROR: $msg\u001b[0m")
           stack.foreach { frame =>
-            println(s"\u001b[31m\t$frame\u001b[0m")
+            println(s"\u001b[31m\t\t$frame\u001b[0m")
           }
   }
