@@ -1,10 +1,8 @@
-
 def new(args) = intrinsic
 def head(list) = intrinsic
 def tail(list) = intrinsic
 def is(list) = intrinsic
 def is_empty(list) = intrinsic
-
 def ::(a, b) = intrinsic
 
 def len([]) = 0

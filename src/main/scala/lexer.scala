@@ -68,6 +68,11 @@ private class LexerInner(source: Source):
 
   def next: Tok =
     sc.next match
+      case Some('#') =>
+        sc.consume(_ != '\n')
+        sc.close
+        next
+
       case Some('(' | ')' | '{' | '}' | '[' | ']' | ',' | '.') =>
         Tok.Key(sc.lexeme) withSpan sc.close
 

@@ -1,5 +1,6 @@
 def add1(x) = x + 1
 
+# asdf
 def main() = {
   println("Length of nil: " ++ len([]))
   println("Length of 1: " ++ len(0 :: []))
