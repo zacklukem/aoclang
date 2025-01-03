@@ -3,6 +3,11 @@ def test_set_new() = {
   assert(Tuple.size(root) == 32)
 }
 
+def test_xyz() = {
+  let x = (0, 1)
+  x.1
+}
+
 def test_set_put() = {
   let set = Set.new()
 

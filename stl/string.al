@@ -1,3 +1,3 @@
-def chars(str) = intrinsic
-def size(str) = intrinsic
-def from_chars(chars) = intrinsic
+def chars(str) = __intrinsic__("StringChars", str)
+def size(str) = __intrinsic__("StringSize", str)
+def from_chars(chars) = __intrinsic__("StringFromChars", chars)

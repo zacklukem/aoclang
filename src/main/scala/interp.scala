@@ -37,7 +37,7 @@ class Interp(val decls: Map[Symbol, LowDecl]):
 
     e match
       case Tree.AppF(fn, Symbol.Ret, args) =>
-         env.get(fn) match
+        env.get(fn) match
           case Some(Value.Closure(argSyms, tree, env)) =>
             val fenv = argSyms.zip(args.map(genv)).toMap
             eval(tree)(using fenv ++ env, fn :: stack)
@@ -46,9 +46,6 @@ class Interp(val decls: Map[Symbol, LowDecl]):
               case LowDecl.Def(argSyms, tree) =>
                 val fenv = argSyms.zip(args.map(genv)).toMap
                 eval(tree)(using fenv, fn :: stack)
-              case LowDecl.Intrinsic(f) =>
-                try INTRINSICS(f)(args.map(genv))
-                catch case Xcept(msg) => throw XceptWithStack(msg, stack)
 
       case Tree.AppF(fn, retC, args) =>
         val res = env.get(fn) match
@@ -60,14 +57,17 @@ class Interp(val decls: Map[Symbol, LowDecl]):
               case LowDecl.Def(argSyms, tree) =>
                 val fenv = argSyms.zip(args.map(genv)).toMap
                 evalNonTail(tree)(using fenv, fn :: stack)
-              case LowDecl.Intrinsic(f) =>
-                try INTRINSICS(f)(args.map(genv))
-                catch case Xcept(msg) => throw XceptWithStack(msg, stack)
 
         if retC == Symbol.Ret then res
         else
           val (body, fenvp) = appc_env(retC, List(res))
           eval(body)(using fenvp)
+
+      case Tree.LetP(name, op, args, body) =>
+        val v =
+          try INTRINSICS(op)(args.map(genv))
+          catch case Xcept(msg) => throw XceptWithStack(msg, stack)
+        eval(body)(using env + (name -> v))
 
       case Tree.AppC(fn, rawArgs) =>
         val args = rawArgs.map(genv)

@@ -33,9 +33,7 @@ class Parser(source: Source):
         val args = parseDeclArgList()
         expectEq(lx.next, Tok.Key(")"))
         expectEq(lx.next, Tok.Key("="))
-        val body: Expr | Intrinsic =
-          if lx.peek == Tok.Key("intrinsic") then Intrinsic(lx.next.span.get)
-          else parseSingleExpr
+        val body: Expr = parseSingleExpr
 
         Decl.Def(name, args, body)
       case tok => emit(tok.span.get, s"Unexpected: $tok")

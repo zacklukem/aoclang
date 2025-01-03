@@ -1,10 +1,9 @@
-def new(args) = intrinsic
-def head(list) = intrinsic
-def tail(list) = intrinsic
-def is(list) = intrinsic
-def is_empty(list) = intrinsic
-def to_tuple(list) = intrinsic
-def ::(a, b) = intrinsic
+def head(list) = __intrinsic__("ListHead", list)
+def tail(list) = __intrinsic__("ListTail", list)
+def is(list) = __intrinsic__("ListIs", list)
+def is_empty(list) = __intrinsic__("ListIsEmpty", list)
+def to_tuple(list) = __intrinsic__("ListToTuple", list)
+def ::(a, b) = __intrinsic__("ListCons", a, b)
 
 def len(arr) = _len(arr, 0)
 

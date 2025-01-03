@@ -1,1 +1,0 @@
-def read_string(filename) = intrinsic

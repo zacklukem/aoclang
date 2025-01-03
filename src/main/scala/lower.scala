@@ -22,12 +22,21 @@ object Symbol:
     idx += 1
     Local(s"$name$idx")
 
+enum PrimOp:
+  case PrintLine, Assert, HashCode
+  case Eq, Neq, Lt, Gt, Le, Ge, Add, Sub, Mul, DivInt, DivFloat, Mod, Pow, BAnd, BOr, Xor, Shl, Shr,
+    Concat, Not
+  case ListNew, ListHead, ListTail, ListIs, ListIsEmpty, ListToTuple, ListCons
+  case TupleNew, TupleGet, TupleIs, TupleSize, TuplePut
+  case StringChars, StringSize, StringFromChars
+
 enum Tree:
   case AppF(fn: Symbol, retC: Symbol, args: List[Symbol])
   case AppC(fn: Symbol, args: List[Symbol])
   case LetC(name: Symbol, args: List[Symbol], value: Tree, body: Tree)
   case LetF(name: Symbol, args: List[Symbol], value: Tree, body: Tree)
   case LetL(name: Symbol, value: LitValue, body: Tree)
+  case LetP(name: Symbol, prim: PrimOp, args: List[Symbol], body: Tree)
   case If(cond: Symbol, thenC: Symbol, elseC: Symbol)
   case Raise(value: Symbol)
 
@@ -52,6 +61,9 @@ enum Tree:
       case Tree.LetL(name, value, body) =>
         line(s"letl ${name} = ${value}")
         body.pretty(depth)
+      case Tree.LetP(name, prim, args, body) =>
+        line(s"letp ${name} = ${prim}(${args.mkString(",")})")
+        body.pretty(depth)
       case Tree.If(cond, thenC, elseC) =>
         line(s"if ${cond} then ${thenC} else ${elseC}")
       case Tree.Raise(value) =>
@@ -59,7 +71,6 @@ enum Tree:
 
 enum LowDecl:
   case Def(args: List[Symbol], body: Tree)
-  case Intrinsic(name: String)
 
   def pretty(): Unit =
     this match
@@ -67,8 +78,6 @@ enum LowDecl:
         println(s"def ${args.mkString(",")} = {")
         body.pretty(1)
         println("}")
-      case LowDecl.Intrinsic(name) =>
-        println(s"intrinsic ${name}")
 
 extension (s: String) def :@:(b: String): Symbol = Symbol.Global(List(s, b))
 
@@ -78,6 +87,10 @@ private def letl(value: LitValue)(body: Symbol => Tree): Tree =
 
 private def letlNone(body: Symbol => Tree): Tree =
   letl(Sym.none)(body)
+
+private def letp(prim: PrimOp, args: List[Symbol])(body: Symbol => Tree): Tree =
+  val sym = Symbol.local
+  Tree.LetP(sym, prim, args, body(sym))
 
 private def letc(args: List[Symbol], value: Tree)(body: Symbol => Tree): Tree =
   val sym = Symbol.local
@@ -253,11 +266,6 @@ class Lower:
       .groupBy { case Decl.Def(name, _, _) => name.span.get.text }
       .foreach { case (name, decl) =>
         decl.head match
-          case Decl.Def(_, _, Intrinsic(_)) =>
-            assert(decl.size == 1)
-
-            val symbol = modules(mod)(name)
-            decls(symbol) = LowDecl.Intrinsic(s"$mod.$name")
           case Decl.Def(_, args, _) =>
             val arity = args.length
             val symbol = modules(mod)(name)
@@ -311,6 +319,11 @@ class LowerExpr(
           }
         }
 
+      case Expr.App(Expr.Var(Tok.Id("__intrinsic__")), Expr.Lit(Tok.Lit(op: String)) :: args) =>
+        lower(args) { args =>
+          letp(PrimOp.valueOf(op), args)(c)
+        }
+
       case Expr.App(fn, args) =>
         lower(fn) { fn =>
           lower(args) { args =>
@@ -354,14 +367,12 @@ class LowerExpr(
 
       case Expr.Tuple(_, elems, _) =>
         lower(elems) { args =>
-          val res = Symbol.local
-          letc(List(res), c(res))(Tree.AppF("Tuple" :@: "new", _, args))
+          letp(PrimOp.TupleNew, args)(c)
         }
 
       case Expr.ListLit(_, elems, _) =>
         lower(elems) { args =>
-          val res = Symbol.local
-          letc(List(res), c(res))(Tree.AppF("List" :@: "new", _, args))
+          letp(PrimOp.ListNew, args)(c)
         }
 
       case Expr.TupleField(tup, Tok.Lit(idx: Long)) =>
@@ -424,6 +435,11 @@ class LowerExpr(
           }
         }
 
+      case Expr.App(Expr.Var(Tok.Id("__intrinsic__")), Expr.Lit(Tok.Lit(op: String)) :: args) =>
+        lower(args) { args =>
+          letp(PrimOp.valueOf(op), args)(cf)
+        }
+
       case Expr.App(fn, args) =>
         lower(fn) { fn =>
           lower(args) { args =>
@@ -461,7 +477,7 @@ class LowerExpr(
 
       case Expr.Tuple(_, elems, _) =>
         lower(elems) { args =>
-          Tree.AppF("Tuple" :@: "new", c, args)
+          letp(PrimOp.TupleNew, args)(cf)
         }
 
       case Expr.TupleField(tup, Tok.Lit(idx: Long)) =>
@@ -473,7 +489,7 @@ class LowerExpr(
 
       case Expr.ListLit(_, elems, _) =>
         lower(elems) { args =>
-          Tree.AppF("List" :@: "new", c, args)
+          letp(PrimOp.ListNew, args)(cf)
         }
 
       case Expr.Match(expr, _, cases, _) =>

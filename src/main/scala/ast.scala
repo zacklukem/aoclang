@@ -6,13 +6,11 @@ type LitValue = String | Long | Double | Boolean | Sym
 
 case class TopLevel(decls: List[Decl])
 
-case class Intrinsic(override val span: Span) extends Node(span)
-
 enum Decl(span: Span) extends Node(span):
   case Def(
       name: Tok.Id | Tok.Op,
       args: List[Pat],
-      body: Expr | Intrinsic
+      body: Expr
   ) extends Decl(name.span.get ++ body.span)
 
 enum Pat(span: Span) extends Node(span):

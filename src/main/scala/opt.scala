@@ -29,6 +29,8 @@ class Optimizer:
       case Tree.LetF(name, args, value, body) =>
         // TODO: Hoisting should happen before (if ever)
         Tree.LetF(name, args, shrinking(value), shrinking(body))
+      case Tree.LetP(name, op, args, body) =>
+        Tree.LetP(name, op, args.map(state.sub), shrinking(body))
       case Tree.AppF(fn, retC, args) =>
         Tree.AppF(state.sub(fn), state.sub(retC), args.map(state.sub))
       case Tree.AppC(fn, args) =>
