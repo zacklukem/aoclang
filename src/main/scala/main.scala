@@ -51,9 +51,19 @@ def main(): Unit =
   moduleAsts.foreach({ case (mod, decls) => lower.declare(mod, decls) })
   moduleAsts.foreach({ case (mod, decls) => lower.lower(mod, decls) })
 
-  val interp = Interp(lower.decls.toMap)
+  val opt = Optimizer()
 
-  lower.decls.foreach { case (name, decl) =>
+  val decls = lower.decls
+    .map({
+      case (name, LowDecl.Def(args, body)) =>
+        name -> LowDecl.Def(args, opt.opt(body))
+      case decl => decl
+    })
+    .toMap
+
+  val interp = Interp(decls)
+
+  decls.foreach { case (name, decl) =>
     if isTest(name) then
       print(s"\u001b[34mTEST $name... \u001b[0m".padTo(60, ' '))
       val LowDecl.Def(_, body) = decl
