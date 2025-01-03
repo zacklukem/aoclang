@@ -139,7 +139,7 @@ private def lower_pat(p: Pat, rhs: Symbol)(c: Option[Map[Tok.Id | Tok.Op, Symbol
 
     case Pat.Lit(Tok.Lit(lit)) =>
       letl(lit) { lit =>
-        app("Stl" :@: "==", List(rhs, lit)) { is_eq =>
+        letp(PrimOp.Eq, List(rhs, lit)) { is_eq =>
           iff(is_eq) {
             c(Some(Map.empty))
           } { c(None) }
@@ -147,15 +147,15 @@ private def lower_pat(p: Pat, rhs: Symbol)(c: Option[Map[Tok.Id | Tok.Op, Symbol
       }
 
     case Pat.Tuple(_, pats, _) =>
-      app("Tuple" :@: "is", List(rhs)) { is_tuple =>
+      letp(PrimOp.TupleIs, List(rhs)) { is_tuple =>
         iff(is_tuple) {
-          app("Tuple" :@: "size", List(rhs)) { size =>
+          letp(PrimOp.TupleSize, List(rhs)) { size =>
             letl(pats.size.toLong) { expected_size =>
-              app("Stl" :@: "==", List(size, expected_size)) { is_eq =>
+              letp(PrimOp.Eq, List(size, expected_size)) { is_eq =>
                 iff(is_eq) {
                   applyAll(pats.indices) { (idx, c) =>
                     letl(idx.toLong) { idx =>
-                      app("Tuple" :@: "get", List(rhs, idx)) { value =>
+                      letp(PrimOp.TupleGet, List(rhs, idx)) { value =>
                         c(value)
                       }
                     }
@@ -172,15 +172,15 @@ private def lower_pat(p: Pat, rhs: Symbol)(c: Option[Map[Tok.Id | Tok.Op, Symbol
       }
 
     case Pat.Cons(head, tail) =>
-      app("List" :@: "is", List(rhs)) { is_list =>
+      letp(PrimOp.ListIs, List(rhs)) { is_list =>
         iff(is_list) {
-          app("List" :@: "head", List(rhs)) { headVal =>
+          letp(PrimOp.ListHead, List(rhs)) { headVal =>
             letl(Sym.none) { nonel =>
-              app("Stl" :@: "!=", List(headVal, nonel)) { head_is_some =>
+              letp(PrimOp.Neq, List(headVal, nonel)) { head_is_some =>
                 iff(head_is_some) {
                   lower_pat(head, headVal) {
                     case Some(head_bindings) =>
-                      app("List" :@: "tail", List(rhs)) { tailVal =>
+                      letp(PrimOp.ListTail, List(rhs)) { tailVal =>
                         lower_pat(tail, tailVal) {
                           case Some(tail_bindings) => c(Some(head_bindings ++ tail_bindings))
                           case None                => c(None)
@@ -196,9 +196,9 @@ private def lower_pat(p: Pat, rhs: Symbol)(c: Option[Map[Tok.Id | Tok.Op, Symbol
       }
 
     case Pat.ListLit(_, Nil, _) =>
-      app("List" :@: "is", List(rhs)) { is_list =>
+      letp(PrimOp.ListIs, List(rhs)) { is_list =>
         iff(is_list) {
-          app("List" :@: "is_empty", List(rhs)) { is_empty =>
+          letp(PrimOp.ListIsEmpty, List(rhs)) { is_empty =>
             iff(is_empty) {
               c(Some(Map.empty))
             } { c(None) }
@@ -223,17 +223,17 @@ private def lower_pat(p: Pat, rhs: Symbol)(c: Option[Map[Tok.Id | Tok.Op, Symbol
           case Nil =>
             c(Some(bindings))
           case pat :: tail =>
-            app("List" :@: "head", List(prev)) { head =>
+            letp(PrimOp.ListHead, List(prev)) { head =>
               lower_pat(pat, head) {
                 case Some(head_bindings) =>
-                  app("List" :@: "tail", List(prev)) { tailVal =>
+                  letp(PrimOp.ListTail, List(prev)) { tailVal =>
                     reduce_pats(tail, tailVal, bindings ++ head_bindings)
                   }
                 case None => c(None)
               }
             }
 
-      app("List" :@: "is", List(rhs)) { is_list =>
+      letp(PrimOp.ListIs, List(rhs)) { is_list =>
         iff(is_list) {
           reduce_pats(pats, rhs, Map.empty)
         } { c(None) }
@@ -377,11 +377,8 @@ class LowerExpr(
 
       case Expr.TupleField(tup, Tok.Lit(idx: Long)) =>
         lower(tup) { tup =>
-          val res = Symbol.local
           letl(idx) { idx =>
-            letc(List(res), c(res))(
-              Tree.AppF("Tuple" :@: "get", _, List(tup, idx))
-            )
+            letp(PrimOp.TupleGet, List(tup, idx))(c)
           }
         }
 
@@ -483,7 +480,7 @@ class LowerExpr(
       case Expr.TupleField(tup, Tok.Lit(idx: Long)) =>
         lower(tup) { tup =>
           letl(idx) { idx =>
-            Tree.AppF("Tuple" :@: "get", c, List(tup, idx))
+            letp(PrimOp.TupleGet, List(tup, idx))(cf)
           }
         }
 
