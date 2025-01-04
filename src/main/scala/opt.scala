@@ -61,7 +61,7 @@ class Optimizer(val decls: mutable.Map[Symbol, Decl]):
         val Decl.Def(params, body) = decls(fn)
         if body.size() <= limit then
           val subs = ((Symbol.Ret -> retC) :: params.zip(args)).toMap
-          body.resym().subst(subs)
+          body.resym(Symbol.local).subst(subs)
         else Tree.AppF(fn, retC, args)
 
       case Tree.LetC(name, args, value, body) =>

@@ -1,43 +1,17 @@
 package aoclang
 
 trait TreeMod:
-  def letl(value: LitValue)(body: Symbol => Tree): Tree =
-    val sym = Symbol.local
-    Tree.LetL(sym, value, body(sym))
-
-  def letlNone(body: Symbol => Tree): Tree =
-    letl(Sym.none)(body)
-
-  def letp(prim: PrimOp, args: List[Symbol])(body: Symbol => Tree): Tree =
-    val sym = Symbol.local
-    Tree.LetP(sym, prim, args, body(sym))
-
-  def letc(args: List[Symbol], value: Tree)(body: Symbol => Tree): Tree =
-    val sym = Symbol.local
-    Tree.LetC(sym, args, value, body(sym))
-
-  def app(fn: Symbol, args: List[Symbol])(thenC: Symbol => Tree): Tree =
-    val ret = Symbol.local
-    letc(List(ret), thenC(ret)) { retC =>
-      Tree.AppF(fn, retC, args)
-    }
-
-  def iff(cond: Symbol)(thenT: => Tree)(elseT: => Tree): Tree =
-    letc(List(), thenT) { thenC =>
-      letc(List(), elseT) { elseC =>
-        Tree.If(cond, thenC, elseC)
-      }
-    }
+  type Name
 
   enum Tree:
-    case AppF(fn: Symbol, retC: Symbol, args: List[Symbol])
-    case AppC(fn: Symbol, args: List[Symbol])
-    case LetC(name: Symbol, args: List[Symbol], value: Tree, body: Tree)
-    case LetF(name: Symbol, args: List[Symbol], value: Tree, body: Tree)
-    case LetL(name: Symbol, value: LitValue, body: Tree)
-    case LetP(name: Symbol, prim: PrimOp, args: List[Symbol], body: Tree)
-    case If(cond: Symbol, thenC: Symbol, elseC: Symbol)
-    case Raise(value: Symbol)
+    case AppF(fn: Name, retC: Name, args: List[Name])
+    case AppC(fn: Name, args: List[Name])
+    case LetC(name: Name, args: List[Name], value: Tree, body: Tree)
+    case LetF(name: Name, args: List[Name], value: Tree, body: Tree)
+    case LetL(name: Name, value: LitValue, body: Tree)
+    case LetP(name: Name, prim: PrimOp, args: List[Name], body: Tree)
+    case If(cond: Name, thenC: Name, elseC: Name)
+    case Raise(value: Name)
 
     def size(): Int =
       this match
@@ -50,21 +24,21 @@ trait TreeMod:
         case Tree.If(cond, thenC, elseC)  => 1
         case Tree.Raise(value)            => 1
 
-    def resym(): Tree = this match
+    def resym(mkName: => Name): Tree = this match
       case Tree.LetC(name, args, value, body) =>
-        val newName = Symbol.local
-        val newArgs = args.map { _ => Symbol.local }
+        val newName = mkName
+        val newArgs = args.map { _ => mkName }
         Tree.LetC(
           newName,
           newArgs,
-          value.subst(args.zip(newArgs).toMap).resym(),
+          value.subst(args.zip(newArgs).toMap).resym(mkName),
           body.subst(Map(name -> newName))
         )
       case Tree.LetL(name, value, body) =>
-        val newName = Symbol.local
+        val newName = mkName
         Tree.LetL(newName, value, body.subst(Map(name -> newName)))
       case Tree.LetP(name, prim, args, body) =>
-        val newName = Symbol.local
+        val newName = mkName
         Tree.LetP(newName, prim, args, body.subst(Map(name -> newName)))
       case Tree.AppF(fn, retC, args) =>
         Tree.AppF(fn, retC, args)
@@ -77,8 +51,8 @@ trait TreeMod:
 
       case Tree.LetF(name, args, value, body) => ???
 
-    def subst(subst: Map[Symbol, Symbol]): Tree =
-      def sub(s: Symbol): Symbol = subst.getOrElse(s, s)
+    def subst(subst: Map[Name, Name]): Tree =
+      def sub(s: Name): Name = subst.getOrElse(s, s)
 
       this match
         case Tree.AppF(fn, retC, args) => Tree.AppF(sub(fn), sub(retC), args.map(sub))
@@ -123,13 +97,42 @@ trait TreeMod:
           line(s"raise ${value}")
 
   enum Decl:
-    case Def(args: List[Symbol], body: Tree)
+    case Def(args: List[Name], body: Tree)
 
-    def pretty(name: Symbol): Unit =
+    def pretty(name: Name): Unit =
       this match
         case Decl.Def(args, body) =>
           println(s"def $name(${args.mkString(",")}) = {")
           body.pretty(1)
           println("}")
 
-object High extends TreeMod
+object High extends TreeMod:
+  type Name = Symbol
+
+  def letl(value: LitValue)(body: Symbol => Tree): Tree =
+    val sym = Symbol.local
+    Tree.LetL(sym, value, body(sym))
+
+  def letlNone(body: Symbol => Tree): Tree =
+    letl(Sym.none)(body)
+
+  def letp(prim: PrimOp, args: List[Symbol])(body: Symbol => Tree): Tree =
+    val sym = Symbol.local
+    Tree.LetP(sym, prim, args, body(sym))
+
+  def letc(args: List[Symbol], value: Tree)(body: Symbol => Tree): Tree =
+    val sym = Symbol.local
+    Tree.LetC(sym, args, value, body(sym))
+
+  def app(fn: Symbol, args: List[Symbol])(thenC: Symbol => Tree): Tree =
+    val ret = Symbol.local
+    letc(List(ret), thenC(ret)) { retC =>
+      Tree.AppF(fn, retC, args)
+    }
+
+  def iff(cond: Symbol)(thenT: => Tree)(elseT: => Tree): Tree =
+    letc(List(), thenT) { thenC =>
+      letc(List(), elseT) { elseC =>
+        Tree.If(cond, thenC, elseC)
+      }
+    }
