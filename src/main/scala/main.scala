@@ -31,6 +31,11 @@ def isTest(s: Symbol) =
     case Symbol.Global(List(mod, fn)) => mod.startsWith("Test") && fn.startsWith("test_")
     case _                            => false
 
+def dumpAll(decls: Map[Symbol, LowDecl]): Unit =
+  decls.foreach { case (name, decl) =>
+    decl.pretty(name)
+  }
+
 @main
 def main(): Unit =
   val stl_root = Path.of("stl")

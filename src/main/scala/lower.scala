@@ -41,6 +41,44 @@ enum Tree:
   case If(cond: Symbol, thenC: Symbol, elseC: Symbol)
   case Raise(value: Symbol)
 
+  def size(): Int =
+    this match
+      case Tree.AppF(_, _, args)        => 1
+      case Tree.AppC(_, args)           => 1
+      case Tree.LetC(_, _, value, body) => 1 + value.size() + body.size()
+      case Tree.LetF(_, _, value, body) => 1 + value.size() + body.size()
+      case Tree.LetL(_, _, body)        => 1 + body.size()
+      case Tree.LetP(_, _, args, body)  => 1 + body.size()
+      case Tree.If(cond, thenC, elseC)  => 1
+      case Tree.Raise(value)            => 1
+
+  def resym(): Tree = this match
+    case Tree.LetC(name, args, value, body) =>
+      val newName = Symbol.local
+      val newArgs = args.map { _ => Symbol.local }
+      Tree.LetC(
+        newName,
+        newArgs,
+        value.subst(args.zip(newArgs).toMap).resym(),
+        body.subst(Map(name -> newName))
+      )
+    case Tree.LetL(name, value, body) =>
+      val newName = Symbol.local
+      Tree.LetL(newName, value, body.subst(Map(name -> newName)))
+    case Tree.LetP(name, prim, args, body) =>
+      val newName = Symbol.local
+      Tree.LetP(newName, prim, args, body.subst(Map(name -> newName)))
+    case Tree.AppF(fn, retC, args) =>
+      Tree.AppF(fn, retC, args)
+    case Tree.AppC(fn, args) =>
+      Tree.AppC(fn, args)
+    case Tree.If(cond, thenC, elseC) =>
+      Tree.If(cond, thenC, elseC)
+    case Tree.Raise(value) =>
+      Tree.Raise(value)
+
+    case Tree.LetF(name, args, value, body) => ???
+
   def subst(subst: Map[Symbol, Symbol]): Tree =
     def sub(s: Symbol): Symbol = subst.getOrElse(s, s)
 
@@ -89,10 +127,10 @@ enum Tree:
 enum LowDecl:
   case Def(args: List[Symbol], body: Tree)
 
-  def pretty(): Unit =
+  def pretty(name: Symbol): Unit =
     this match
       case LowDecl.Def(args, body) =>
-        println(s"def ${args.mkString(",")} = {")
+        println(s"def $name(${args.mkString(",")}) = {")
         body.pretty(1)
         println("}")
 

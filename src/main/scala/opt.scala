@@ -2,6 +2,10 @@ package aoclang
 
 import scala.collection.mutable
 
+def pure(prim: PrimOp) = prim match
+  case PrimOp.PrintLine | PrimOp.Assert => false
+  case _                                => true
+
 case class State(
     useCount: Map[Symbol, Int],
     lit: Map[LitValue, Symbol] = Map.empty,
@@ -30,21 +34,92 @@ case class State(
     copy(cnts = cnts + (name -> cnt))
 
 def optimize(decls: Map[Symbol, LowDecl]): Map[Symbol, LowDecl] =
-  val opt = Optimizer()
+  val opt = Optimizer(mutable.Map.from(decls))
+  opt.opt()
+  opt.decls.toMap
 
-  decls
-    .map({
+class Optimizer(val decls: mutable.Map[Symbol, LowDecl]):
+  def opt(): Unit =
+    decls.foreach {
       case (name, LowDecl.Def(args, body)) =>
-        name -> LowDecl.Def(args, opt.opt(body))
-      case decl => decl
-    })
+        decls(name) = LowDecl.Def(
+          args,
+          body
+            |> shrink
+            |> { t => inlining(t)(using 1) }
+            |> shrink
+            |> { t => inlining(t)(using 2) }
+            |> shrink
+        )
+      case _ =>
+    }
 
-class Optimizer:
-  def opt(t: Tree): Tree =
+  private def inlining(t: Tree)(using limit: Int): Tree =
+    t match
+      case Tree.AppF(fn: Symbol.Global, retC, args) =>
+        val LowDecl.Def(params, body) = decls(fn)
+        if body.size() <= limit then
+          val subs = ((Symbol.Ret -> retC) :: params.zip(args)).toMap
+          body.resym().subst(subs)
+        else Tree.AppF(fn, retC, args)
+
+      case Tree.LetC(name, args, value, body) =>
+        Tree.LetC(name, args, inlining(value), inlining(body))
+      case Tree.LetL(name, value, body) =>
+        Tree.LetL(name, value, inlining(body))
+      case Tree.LetP(name, prim, args, body) =>
+        Tree.LetP(name, prim, args, inlining(body))
+      case t => t
+
+  private def shrink(t: Tree): Tree =
     val optT = shrinking(t)(using State(census(t)))
-    if t == optT then t else opt(optT)
+    if t == optT then t else shrink(optT)
 
-  def census(t: Tree): Map[Symbol, Int] =
+  private def shrinking(t: Tree)(using state: State): Tree =
+    t match
+      // CSE
+      case Tree.LetL(name, value, body) if state.lit.contains(value) =>
+        shrinking(body)(using state.withSub(name, state.lit(value)))
+      case Tree.LetP(name, op, args, body) if pure(op) && state.prim.contains((op, args)) =>
+        shrinking(body)(using state.withSub(name, state.prim((op, args))))
+
+      // Dead code elimination
+      case Tree.LetL(name, value, body) if state.count(name) == 0 =>
+        shrinking(body)
+      case Tree.LetC(name, args, value, body) if state.count(name) == 0 =>
+        shrinking(body)
+      case Tree.LetP(name, op, args, body) if state.count(name) == 0 && pure(op) =>
+        shrinking(body)
+
+      // Shrinking inlining
+      case Tree.AppC(fn, args) if fn != Symbol.Ret && state.count(fn) == 1 =>
+        val Tree.LetC(_, params, body, _) = state.cnts(fn)
+        body.subst(params.zip(args).toMap)
+        shrinking(body)(using state.withSub(params.zip(args)))
+
+      case Tree.LetL(name, value, body) =>
+        Tree.LetL(name, value, shrinking(body)(using state.withLit(value, name)))
+      case cnt @ Tree.LetC(name, args, value, body) =>
+        Tree.LetC(name, args, shrinking(value), shrinking(body)(using state.withCnt(name, cnt)))
+      case Tree.LetP(name, op, args, body) =>
+        Tree.LetP(
+          name,
+          op,
+          args.map(state.sub),
+          shrinking(body)(using state.withPrim(op, args, name))
+        )
+      case Tree.AppF(fn, retC, args) =>
+        Tree.AppF(state.sub(fn), state.sub(retC), args.map(state.sub))
+      case Tree.AppC(fn, args) =>
+        Tree.AppC(state.sub(fn), args.map(state.sub))
+      case Tree.If(cond, thenC, elseC) =>
+        Tree.If(state.sub(cond), state.sub(thenC), state.sub(elseC))
+      case Tree.Raise(value) =>
+        Tree.Raise(state.sub(value))
+
+      case Tree.LetF(name, args, value, body) => throw new Error()
+
+  private def census(t: Tree): Map[Symbol, Int] =
     def census(t: Tree)(using useCount: mutable.Map[Symbol, Int]): Unit =
       def use(s: Symbol) = useCount.update(s, useCount.getOrElse(s, 0) + 1)
 
@@ -74,50 +149,3 @@ class Optimizer:
     val res = mutable.Map.empty[Symbol, Int]
     census(t)(using res)
     res.toMap
-
-  private def shrinking(t: Tree)(using state: State): Tree =
-    t match
-      // CSE
-      case Tree.LetL(name, value, body) if state.lit.contains(value) =>
-        shrinking(body)(using state.withSub(name, state.lit(value)))
-      case Tree.LetP(name, op, args, body) if pure(op) && state.prim.contains((op, args)) =>
-        shrinking(body)(using state.withSub(name, state.prim((op, args))))
-
-      // Dead code elimination
-      case Tree.LetL(name, value, body) if state.count(name) == 0 =>
-        shrinking(body)
-      case Tree.LetC(name, args, value, body) if state.count(name) == 0 =>
-        shrinking(body)
-      case Tree.LetP(name, op, args, body) if state.count(name) == 0 && pure(op) =>
-        shrinking(body)
-
-      // Shrinking inlining
-      case Tree.AppC(fn, args) if fn != Symbol.Ret && state.count(fn) == 1 =>
-        val Tree.LetC(_, params, body, _) = state.cnts(fn)
-        shrinking(body)(using state.withSub(params.zip(args)))
-
-      case Tree.LetL(name, value, body) =>
-        Tree.LetL(name, value, shrinking(body)(using state.withLit(value, name)))
-      case cnt @ Tree.LetC(name, args, value, body) =>
-        Tree.LetC(name, args, shrinking(value), shrinking(body)(using state.withCnt(name, cnt)))
-      case Tree.LetP(name, op, args, body) =>
-        Tree.LetP(
-          name,
-          op,
-          args.map(state.sub),
-          shrinking(body)(using state.withPrim(op, args, name))
-        )
-      case Tree.AppF(fn, retC, args) =>
-        Tree.AppF(state.sub(fn), state.sub(retC), args.map(state.sub))
-      case Tree.AppC(fn, args) =>
-        Tree.AppC(state.sub(fn), args.map(state.sub))
-      case Tree.If(cond, thenC, elseC) =>
-        Tree.If(state.sub(cond), state.sub(thenC), state.sub(elseC))
-      case Tree.Raise(value) =>
-        Tree.Raise(state.sub(value))
-
-      case Tree.LetF(name, args, value, body) => throw new Error()
-
-def pure(prim: PrimOp) = prim match
-  case PrimOp.PrintLine | PrimOp.Assert => false
-  case _                                => true
