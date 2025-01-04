@@ -1,6 +1,7 @@
 package aoclang
 
 import scala.annotation.tailrec
+import High.*;
 
 enum Value:
   case Tuple(vs: Array[Value])
@@ -9,7 +10,7 @@ enum Value:
   case Closure(fn: Symbol.Global, env: Option[Value])
   case Cnt(args: List[Symbol], body: Tree, env: Map[Symbol, Value])
 
-class Interp(val decls: Map[Symbol, LowDecl]):
+class Interp(val decls: Map[Symbol, Decl]):
   private def evalNonTail(e: Tree)(using env: Map[Symbol, Value], stack: List[Symbol]): Value =
     eval(e)
 
@@ -29,36 +30,36 @@ class Interp(val decls: Map[Symbol, LowDecl]):
       case Tree.AppF(fn, Symbol.Ret, args) =>
         fn match
           case fn: Symbol.Global =>
-            val LowDecl.Def(argSyms, tree) = decls(fn)
+            val Decl.Def(argSyms, tree) = decls(fn)
             val fenv = argSyms.zip(args.map(genv)).toMap
             eval(tree)(using fenv, fn :: stack)
 
           case fn =>
             env(fn) match
               case Value.Closure(fn, Some(cenv)) =>
-                val LowDecl.Def(argSyms, tree) = decls(fn)
+                val Decl.Def(argSyms, tree) = decls(fn)
                 val fenv = argSyms.zip(cenv :: args.map(genv)).toMap
                 eval(tree)(using fenv, fn :: stack)
               case Value.Closure(fn, None) =>
-                val LowDecl.Def(argSyms, tree) = decls(fn)
+                val Decl.Def(argSyms, tree) = decls(fn)
                 val fenv = argSyms.zip(args.map(genv)).toMap
                 eval(tree)(using fenv, fn :: stack)
 
       case Tree.AppF(fn, retC, args) =>
         val res = fn match
           case fn: Symbol.Global =>
-            val LowDecl.Def(argSyms, tree) = decls(fn)
+            val Decl.Def(argSyms, tree) = decls(fn)
             val fenv = argSyms.zip(args.map(genv)).toMap
             evalNonTail(tree)(using fenv, fn :: stack)
 
           case fn =>
             env(fn) match
               case Value.Closure(fn, Some(cenv)) =>
-                val LowDecl.Def(argSyms, tree) = decls(fn)
+                val Decl.Def(argSyms, tree) = decls(fn)
                 val fenv = argSyms.zip(cenv :: args.map(genv)).toMap
                 evalNonTail(tree)(using fenv, fn :: stack)
               case Value.Closure(fn, None) =>
-                val LowDecl.Def(argSyms, tree) = decls(fn)
+                val Decl.Def(argSyms, tree) = decls(fn)
                 val fenv = argSyms.zip(args.map(genv)).toMap
                 evalNonTail(tree)(using fenv, fn :: stack)
 

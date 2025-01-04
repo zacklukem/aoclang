@@ -2,18 +2,19 @@ package aoclang
 
 import java.util.UUID
 import scala.collection.mutable
+import High.{Tree, letl, letp, Decl}
 
-def hoist(decls: Map[Symbol, LowDecl]): Map[Symbol, LowDecl] =
+def hoist(decls: Map[Symbol, Decl]): Map[Symbol, Decl] =
   val hoister = Hoist()
 
   decls.map { (name, decl) =>
     decl match
-      case LowDecl.Def(args, body) =>
-        name -> LowDecl.Def(args, hoister.hoist(body)(using Map.empty))
+      case Decl.Def(args, body) =>
+        name -> Decl.Def(args, hoister.hoist(body)(using Map.empty))
   } ++ hoister.newDecls
 
 private class Hoist:
-  val newDecls = mutable.ListBuffer[(Symbol, LowDecl)]()
+  val newDecls = mutable.ListBuffer[(Symbol, Decl)]()
 
   def inSymbols(t: Tree): Set[Symbol] =
     t match
@@ -81,13 +82,13 @@ private class Hoist:
         val defName = Symbol.Global(List("TODO", UUID.randomUUID().toString))
         if enclosed.isEmpty then
           newDecls.append(
-            defName -> LowDecl.Def(args, value)
+            defName -> Decl.Def(args, value)
           )
         else
           val env = Symbol.local
           val envValues = enclosed.map { _ => Symbol.local }
           newDecls.append(
-            defName -> LowDecl.Def(
+            defName -> Decl.Def(
               env :: args,
               loadEnclosed(enclosed.indices.toList, env) { closed =>
                 value.subst(enclosed.zip(closed).toMap)

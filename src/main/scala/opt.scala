@@ -1,6 +1,7 @@
 package aoclang
 
 import scala.collection.mutable
+import High.*
 
 def pure(prim: PrimOp) = prim match
   case PrimOp.PrintLine | PrimOp.Assert => false
@@ -33,16 +34,16 @@ case class State(
   def withCnt(name: Symbol, cnt: Tree.LetC): State =
     copy(cnts = cnts + (name -> cnt))
 
-def optimize(decls: Map[Symbol, LowDecl]): Map[Symbol, LowDecl] =
+def optimize(decls: Map[Symbol, Decl]): Map[Symbol, Decl] =
   val opt = Optimizer(mutable.Map.from(decls))
   opt.opt()
   opt.decls.toMap
 
-class Optimizer(val decls: mutable.Map[Symbol, LowDecl]):
+class Optimizer(val decls: mutable.Map[Symbol, Decl]):
   def opt(): Unit =
     decls.foreach {
-      case (name, LowDecl.Def(args, body)) =>
-        decls(name) = LowDecl.Def(
+      case (name, Decl.Def(args, body)) =>
+        decls(name) = Decl.Def(
           args,
           body
             |> shrink
@@ -57,7 +58,7 @@ class Optimizer(val decls: mutable.Map[Symbol, LowDecl]):
   private def inlining(t: Tree)(using limit: Int): Tree =
     t match
       case Tree.AppF(fn: Symbol.Global, retC, args) =>
-        val LowDecl.Def(params, body) = decls(fn)
+        val Decl.Def(params, body) = decls(fn)
         if body.size() <= limit then
           val subs = ((Symbol.Ret -> retC) :: params.zip(args)).toMap
           body.resym().subst(subs)

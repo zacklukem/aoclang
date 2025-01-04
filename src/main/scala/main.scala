@@ -31,7 +31,7 @@ def isTest(s: Symbol) =
     case Symbol.Global(List(mod, fn)) => mod.startsWith("Test") && fn.startsWith("test_")
     case _                            => false
 
-def dumpAll(decls: Map[Symbol, LowDecl]): Unit =
+def dumpAll(decls: Map[Symbol, High.Decl]): Unit =
   decls.foreach { case (name, decl) =>
     if name == "Rand" :@: "next" then decl.pretty(name)
   }
@@ -71,7 +71,7 @@ def main(): Unit =
   decls.foreach { case (name, decl) =>
     if isTest(name) then
       print(s"\u001b[34mTEST $name... \u001b[0m".padTo(60, ' '))
-      val LowDecl.Def(_, body) = decl
+      val High.Decl.Def(_, body) = decl
       try
         val start = System.nanoTime
         interp.eval(body)(using Map.empty, List(name))
