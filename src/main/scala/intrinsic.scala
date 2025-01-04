@@ -9,11 +9,11 @@ def xcept(str: String): Nothing = throw Xcept(str)
 
 def intrinsicToString(v: Value): String =
   v match
-    case Value.Lit(v)       => v.toString
-    case Value.ListVal(l)   => l.map(intrinsicToString).mkString("[", ", ", "]")
-    case Value.FnRef(ref)   => s"<$ref>"
-    case Value.Tuple(tup)   => tup.map(intrinsicToString).mkString("(", ", ", ")")
-    case Value.Cnt(_, _, _) => s"<cnt>"
+    case Value.Lit(v)         => v.toString
+    case Value.ListVal(l)     => l.map(intrinsicToString).mkString("[", ", ", "]")
+    case Value.Closure(fn, _) => s"<$fn>"
+    case Value.Tuple(tup)     => tup.map(intrinsicToString).mkString("(", ", ", ")")
+    case Value.Cnt(_, _, _)   => s"<cnt>"
 
 val INTRINSICS = Map[PrimOp, List[Value] => Value](
   PrimOp.PrintLine -> {

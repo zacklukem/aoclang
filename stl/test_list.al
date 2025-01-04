@@ -23,7 +23,13 @@ def test_reverse() = {
 }
 
 def test_map() = {
-  assert(map([], /x/ x + 1) == [])
-  assert(map([0], /x/ x + 1) == [1])
-  assert(map([0, 1], /x/ x + 1) == [1, 2])
+  let b = 1
+  let addOne = /x/ {
+    let f = /x/ x + b
+    f(x)
+  }
+
+  assert(map([], addOne)  == [])
+  assert(map([0], addOne) == [1])
+  assert(map([0, 1], addOne) == [1, 2])
 }

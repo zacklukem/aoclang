@@ -47,19 +47,11 @@ def main(): Unit =
     modname -> tree
   }
 
-  val lower = Lower()
-  moduleAsts.foreach({ case (mod, decls) => lower.declare(mod, decls) })
-  moduleAsts.foreach({ case (mod, decls) => lower.lower(mod, decls) })
-
-  val opt = Optimizer()
-
-  val decls = lower.decls
-    .map({
-      case (name, LowDecl.Def(args, body)) =>
-        name -> LowDecl.Def(args, opt.opt(body))
-      case decl => decl
-    })
-    .toMap
+  val decls =
+    moduleAsts
+      |> lower
+      |> hoist
+      |> optimize
 
   val interp = Interp(decls)
 

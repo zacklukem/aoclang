@@ -6,8 +6,7 @@ enum Value:
   case Tuple(vs: Array[Value])
   case ListVal(vs: List[Value])
   case Lit(v: LitValue)
-  case FnRef(v: Symbol.Global)
-  case Closure(args: List[Symbol], body: Tree, env: Map[Symbol, Value])
+  case Closure(fn: Symbol.Global, env: Option[Value])
   case Cnt(args: List[Symbol], body: Tree, env: Map[Symbol, Value])
 
 class Interp(val decls: Map[Symbol, LowDecl]):
@@ -16,52 +15,60 @@ class Interp(val decls: Map[Symbol, LowDecl]):
 
   @tailrec
   final def eval(e: Tree)(using env: Map[Symbol, Value], stack: List[Symbol]): Value =
-    def deepDecl(s: Symbol): LowDecl = decls.get(s) match
-      case Some(d) => d
-      case None =>
-        val Value.FnRef(ref) = env(s)
-        deepDecl(ref)
-
     def appc_env(fn: Symbol, args: List[Value]) =
       val Value.Cnt(argSyms, body, fenv) = env(fn)
       val fenvp = fenv ++ argSyms.zip(args).toMap
       (body, fenvp)
 
     def genv(s: Symbol): Value =
-      env.getOrElse(
-        s, {
-          val gs = s.asInstanceOf[Symbol.Global]
-          Value.FnRef(gs)
-        }
-      )
+      s match
+        case s: Symbol.Local  => env(s)
+        case s: Symbol.Global => Value.Closure(s, None)
 
     e match
       case Tree.AppF(fn, Symbol.Ret, args) =>
-        env.get(fn) match
-          case Some(Value.Closure(argSyms, tree, env)) =>
+        fn match
+          case fn: Symbol.Global =>
+            val LowDecl.Def(argSyms, tree) = decls(fn)
             val fenv = argSyms.zip(args.map(genv)).toMap
-            eval(tree)(using fenv ++ env, fn :: stack)
-          case _ =>
-            deepDecl(fn) match
-              case LowDecl.Def(argSyms, tree) =>
+            eval(tree)(using fenv, fn :: stack)
+
+          case fn =>
+            env(fn) match
+              case Value.Closure(fn, Some(cenv)) =>
+                val LowDecl.Def(argSyms, tree) = decls(fn)
+                val fenv = argSyms.zip(cenv :: args.map(genv)).toMap
+                eval(tree)(using fenv, fn :: stack)
+              case Value.Closure(fn, None) =>
+                val LowDecl.Def(argSyms, tree) = decls(fn)
                 val fenv = argSyms.zip(args.map(genv)).toMap
                 eval(tree)(using fenv, fn :: stack)
 
       case Tree.AppF(fn, retC, args) =>
-        val res = env.get(fn) match
-          case Some(Value.Closure(argSyms, tree, env)) =>
+        val res = fn match
+          case fn: Symbol.Global =>
+            val LowDecl.Def(argSyms, tree) = decls(fn)
             val fenv = argSyms.zip(args.map(genv)).toMap
-            evalNonTail(tree)(using fenv ++ env, fn :: stack)
-          case _ =>
-            deepDecl(fn) match
-              case LowDecl.Def(argSyms, tree) =>
+            evalNonTail(tree)(using fenv, fn :: stack)
+
+          case fn =>
+            env(fn) match
+              case Value.Closure(fn, Some(cenv)) =>
+                val LowDecl.Def(argSyms, tree) = decls(fn)
+                val fenv = argSyms.zip(cenv :: args.map(genv)).toMap
+                evalNonTail(tree)(using fenv, fn :: stack)
+              case Value.Closure(fn, None) =>
+                val LowDecl.Def(argSyms, tree) = decls(fn)
                 val fenv = argSyms.zip(args.map(genv)).toMap
                 evalNonTail(tree)(using fenv, fn :: stack)
 
-        if retC == Symbol.Ret then res
-        else
-          val (body, fenvp) = appc_env(retC, List(res))
-          eval(body)(using fenvp)
+        val (body, fenvp) = appc_env(retC, List(res))
+        eval(body)(using fenvp)
+
+      case Tree.LetP(name, PrimOp.ClosureNew, (fn: Symbol.Global) :: cenv, body) =>
+        val cenvVal = if cenv == Nil then None else Some(Value.Tuple(cenv.map(genv).toArray))
+        val v = Value.Closure(fn, cenvVal)
+        eval(body)(using env + (name -> v))
 
       case Tree.LetP(name, op, args, body) =>
         val v =
@@ -80,10 +87,6 @@ class Interp(val decls: Map[Symbol, LowDecl]):
         val cnt = Value.Cnt(args, value, env)
         eval(body)(using env + (name -> cnt))
 
-      case Tree.LetF(name, args, value, body) =>
-        val cnt = Value.Closure(args, value, env)
-        eval(body)(using env + (name -> cnt))
-
       case Tree.LetL(name, value, body) =>
         val v = Value.Lit(value)
         eval(body)(using env + (name -> v))
@@ -100,3 +103,5 @@ class Interp(val decls: Map[Symbol, LowDecl]):
       case Tree.Raise(v) =>
         try xcept(s"raised: ${genv(v)}")
         catch case Xcept(msg) => throw XceptWithStack(msg, stack)
+
+      case Tree.LetF(name, args, value, body) => throw Error()

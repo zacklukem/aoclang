@@ -13,6 +13,16 @@ case class State(
   def withLit(litValue: LitValue, symbol: Symbol): State =
     copy(lit = lit + (litValue -> symbol))
 
+def optimize(decls: Map[Symbol, LowDecl]): Map[Symbol, LowDecl] =
+  val opt = Optimizer()
+
+  decls
+    .map({
+      case (name, LowDecl.Def(args, body)) =>
+        name -> LowDecl.Def(args, opt.opt(body))
+      case decl => decl
+    })
+
 class Optimizer:
   def opt(t: Tree): Tree =
     val optT = shrinking(t)(using State())
@@ -26,9 +36,6 @@ class Optimizer:
         Tree.LetL(name, value, shrinking(body)(using state.withLit(value, name)))
       case Tree.LetC(name, args, value, body) =>
         Tree.LetC(name, args, shrinking(value), shrinking(body))
-      case Tree.LetF(name, args, value, body) =>
-        // TODO: Hoisting should happen before (if ever)
-        Tree.LetF(name, args, shrinking(value), shrinking(body))
       case Tree.LetP(name, op, args, body) =>
         Tree.LetP(name, op, args.map(state.sub), shrinking(body))
       case Tree.AppF(fn, retC, args) =>
@@ -39,3 +46,5 @@ class Optimizer:
         Tree.If(state.sub(cond), state.sub(thenC), state.sub(elseC))
       case Tree.Raise(value) =>
         Tree.Raise(state.sub(value))
+
+      case Tree.LetF(name, args, value, body) => throw new Error()

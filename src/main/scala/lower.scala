@@ -29,6 +29,7 @@ enum PrimOp:
   case ListNew, ListHead, ListTail, ListIs, ListIsEmpty, ListToTuple, ListCons
   case TupleNew, TupleGet, TupleIs, TupleSize, TuplePut
   case StringChars, StringSize, StringFromChars
+  case ClosureNew
 
 enum Tree:
   case AppF(fn: Symbol, retC: Symbol, args: List[Symbol])
@@ -39,6 +40,22 @@ enum Tree:
   case LetP(name: Symbol, prim: PrimOp, args: List[Symbol], body: Tree)
   case If(cond: Symbol, thenC: Symbol, elseC: Symbol)
   case Raise(value: Symbol)
+
+  def subst(subst: Map[Symbol, Symbol]): Tree =
+    def sub(s: Symbol): Symbol = subst.getOrElse(s, s)
+
+    this match
+      case Tree.AppF(fn, retC, args) => Tree.AppF(sub(fn), sub(retC), args.map(sub))
+      case Tree.AppC(fn, args)       => Tree.AppC(sub(fn), args.map(sub))
+      case Tree.LetC(name, args, value, body) =>
+        Tree.LetC(sub(name), args.map(sub), value.subst(subst), body.subst(subst))
+      case Tree.LetF(name, args, value, body) =>
+        Tree.LetF(sub(name), args.map(sub), value.subst(subst), body.subst(subst))
+      case Tree.LetL(name, value, body) => Tree.LetL(sub(name), value, body.subst(subst))
+      case Tree.LetP(name, prim, args, body) =>
+        Tree.LetP(sub(name), prim, args.map(sub), body.subst(subst))
+      case Tree.If(cond, thenC, elseC) => Tree.If(sub(cond), sub(thenC), sub(elseC))
+      case Tree.Raise(value)           => Tree.Raise(sub(value))
 
   def pretty(depth: Int = 0): Unit =
     def line(s: String) = println("  " * depth + s)
@@ -243,7 +260,13 @@ def emit(span: Span, e: String) =
   span.printLineColumn("error")
   throw new Exception(e)
 
-class Lower:
+def lower(asts: List[(String, List[Decl])]): Map[Symbol, LowDecl] =
+  val lower = Lower()
+  asts.foreach({ case (mod, decls) => lower.declare(mod, decls) })
+  asts.foreach({ case (mod, decls) => lower.lower(mod, decls) })
+  lower.decls.toMap
+
+private class Lower:
   val modules: mutable.Map[String, Map[String, Symbol]] = mutable.Map()
   val decls: mutable.Map[Symbol, LowDecl] = mutable.Map()
 
