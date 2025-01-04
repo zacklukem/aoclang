@@ -97,7 +97,13 @@ trait TreeMod:
           line(s"raise ${value}")
 
   enum Decl:
+    var maxStack: Option[Int] = None
+
     case Def(args: List[Name], body: Tree)
+
+    def withMaxStack(stack: Int): Decl =
+      this.maxStack = Some(stack)
+      this
 
     def pretty(name: Name): Unit =
       this match
@@ -136,3 +142,6 @@ object High extends TreeMod:
         Tree.If(cond, thenC, elseC)
       }
     }
+
+object Low extends TreeMod:
+  type Name = Int | Symbol

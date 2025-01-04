@@ -1,105 +1,105 @@
 package aoclang
 
 import scala.annotation.tailrec
-import High.*;
+import Low.*;
 
 enum Value:
   case Tuple(vs: Array[Value])
   case ListVal(vs: List[Value])
   case Lit(v: LitValue)
   case Closure(fn: Symbol.Global, env: Option[Value])
-  case Cnt(args: List[Symbol], body: Tree, env: Map[Symbol, Value])
+  case Cnt(args: List[Name], body: Tree)
 
 class Interp(val decls: Map[Symbol, Decl]):
-  private def evalNonTail(e: Tree)(using env: Map[Symbol, Value], stack: List[Symbol]): Value =
+  private def evalNonTail(e: Tree)(using frame: Array[Value], stack: List[Name]): Value =
     eval(e)
 
   @tailrec
-  final def eval(e: Tree)(using env: Map[Symbol, Value], stack: List[Symbol]): Value =
-    def appc_env(fn: Symbol, args: List[Value]) =
-      val Value.Cnt(argSyms, body, fenv) = env(fn)
-      val fenvp = fenv ++ argSyms.zip(args).toMap
-      (body, fenvp)
+  final def eval(e: Tree)(using frame: Array[Value], stack: List[Name]): Value =
+    def appc_env(fn: Int, args: List[Value]) =
+      val Value.Cnt(argSyms, body) = frame(fn)
+      argSyms.zip(args).foreach { case (k: Int, v) =>
+        frame(k) = v
+      }
+      body
 
-    def genv(s: Symbol): Value =
+    def genv(s: Name): Value =
       s match
-        case s: Symbol.Local  => env(s)
+        case s: Int           => frame(s)
         case s: Symbol.Global => Value.Closure(s, None)
+
+    def setupAppCall(fn: Name, args: List[Name]) =
+      fn match
+        case fn: Symbol.Global =>
+          val decl @ Decl.Def(argSyms, tree) = decls(fn)
+          val fenv = Array.ofDim[Value](decl.maxStack.get)
+          argSyms.zip(args.map(genv)).foreach { case (k: Int, v) => fenv(k) = v }
+          (tree, fenv, fn :: stack)
+
+        case fn: Int =>
+          frame(fn) match
+            case Value.Closure(fn, Some(cenv)) =>
+              val decl @ Decl.Def(argSyms, tree) = decls(fn)
+              val fenv = Array.ofDim[Value](decl.maxStack.get)
+              argSyms.zip(cenv :: args.map(genv)).foreach { case (k: Int, v) => fenv(k) = v }
+              (tree, fenv, fn :: stack)
+            case Value.Closure(fn, None) =>
+              val decl @ Decl.Def(argSyms, tree) = decls(fn)
+              val fenv = Array.ofDim[Value](decl.maxStack.get)
+              argSyms.zip(args.map(genv)).foreach { case (k: Int, v) => fenv(k) = v }
+              (tree, fenv, fn :: stack)
 
     e match
       case Tree.AppF(fn, Symbol.Ret, args) =>
-        fn match
-          case fn: Symbol.Global =>
-            val Decl.Def(argSyms, tree) = decls(fn)
-            val fenv = argSyms.zip(args.map(genv)).toMap
-            eval(tree)(using fenv, fn :: stack)
-
-          case fn =>
-            env(fn) match
-              case Value.Closure(fn, Some(cenv)) =>
-                val Decl.Def(argSyms, tree) = decls(fn)
-                val fenv = argSyms.zip(cenv :: args.map(genv)).toMap
-                eval(tree)(using fenv, fn :: stack)
-              case Value.Closure(fn, None) =>
-                val Decl.Def(argSyms, tree) = decls(fn)
-                val fenv = argSyms.zip(args.map(genv)).toMap
-                eval(tree)(using fenv, fn :: stack)
+        val (tree, frame, stack) = setupAppCall(fn, args)
+        eval(tree)(using frame, stack)
 
       case Tree.AppF(fn, retC, args) =>
-        val res = fn match
-          case fn: Symbol.Global =>
-            val Decl.Def(argSyms, tree) = decls(fn)
-            val fenv = argSyms.zip(args.map(genv)).toMap
-            evalNonTail(tree)(using fenv, fn :: stack)
+        val (tree, frame, stack) = setupAppCall(fn, args)
+        val res = evalNonTail(tree)(using frame, stack)
+        val body = appc_env(retC.asInstanceOf, List(res))
+        eval(body)
 
-          case fn =>
-            env(fn) match
-              case Value.Closure(fn, Some(cenv)) =>
-                val Decl.Def(argSyms, tree) = decls(fn)
-                val fenv = argSyms.zip(cenv :: args.map(genv)).toMap
-                evalNonTail(tree)(using fenv, fn :: stack)
-              case Value.Closure(fn, None) =>
-                val Decl.Def(argSyms, tree) = decls(fn)
-                val fenv = argSyms.zip(args.map(genv)).toMap
-                evalNonTail(tree)(using fenv, fn :: stack)
-
-        val (body, fenvp) = appc_env(retC, List(res))
-        eval(body)(using fenvp)
-
-      case Tree.LetP(name, PrimOp.ClosureNew, (fn: Symbol.Global) :: cenv, body) =>
+      case Tree.LetP(name: Int, PrimOp.ClosureNew, (fn: Symbol.Global) :: cenv, body) =>
         val cenvVal = if cenv == Nil then None else Some(Value.Tuple(cenv.map(genv).toArray))
         val v = Value.Closure(fn, cenvVal)
-        eval(body)(using env + (name -> v))
+        frame(name) = v
+        eval(body)
 
-      case Tree.LetP(name, op, args, body) =>
+      case Tree.LetP(name: Int, op, args, body) =>
         val v =
           try INTRINSICS(op)(args.map(genv))
           catch case Xcept(msg) => throw XceptWithStack(msg, stack)
-        eval(body)(using env + (name -> v))
+        frame(name) = v
+        eval(body)
 
-      case Tree.AppC(fn, rawArgs) =>
+      case Tree.AppC(Symbol.Ret, rawArgs) =>
         val args = rawArgs.map(genv)
-        if fn == Symbol.Ret then args.head
-        else
-          val (body, fenvp) = appc_env(fn, args)
-          eval(body)(using fenvp)
+        args.head
 
-      case Tree.LetC(name, args, value, body) =>
-        val cnt = Value.Cnt(args, value, env)
-        eval(body)(using env + (name -> cnt))
+      case Tree.AppC(fn: Int, rawArgs) =>
+        val args = rawArgs.map(genv)
+        val body = appc_env(fn, args)
+        eval(body)
 
-      case Tree.LetL(name, value, body) =>
+      case Tree.LetC(name: Int, args, value, body) =>
+        val cnt = Value.Cnt(args, value)
+        frame(name) = cnt
+        eval(body)
+
+      case Tree.LetL(name: Int, value, body) =>
         val v = Value.Lit(value)
-        eval(body)(using env + (name -> v))
+        frame(name) = v
+        eval(body)
 
-      case Tree.If(cond, thenC, elseC) =>
+      case Tree.If(cond, thenC: Int, elseC: Int) =>
         val Value.Lit(b: Boolean) = genv(cond)
         if b then
-          val (body, fenvp) = appc_env(thenC, Nil)
-          eval(body)(using fenvp)
+          val body = appc_env(thenC, Nil)
+          eval(body)
         else
-          val (body, fenvp) = appc_env(elseC, Nil)
-          eval(body)(using fenvp)
+          val body = appc_env(elseC, Nil)
+          eval(body)
 
       case Tree.Raise(v) =>
         try xcept(s"raised: ${genv(v)}")

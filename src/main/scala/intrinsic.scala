@@ -1,7 +1,7 @@
 package aoclang
 
 case class Xcept(msg: String) extends Exception(msg)
-case class XceptWithStack(msg: String, stack: List[Symbol]) extends Exception(msg)
+case class XceptWithStack(msg: String, stack: List[Low.Name]) extends Exception(msg)
 
 def xcept(str: String): Nothing = throw Xcept(str)
 
@@ -11,7 +11,7 @@ def intrinsicToString(v: Value): String =
     case Value.ListVal(l)     => l.map(intrinsicToString).mkString("[", ", ", "]")
     case Value.Closure(fn, _) => s"<$fn>"
     case Value.Tuple(tup)     => tup.map(intrinsicToString).mkString("(", ", ", ")")
-    case Value.Cnt(_, _, _)   => s"<cnt>"
+    case Value.Cnt(_, _)      => s"<cnt>"
 
 val INTRINSICS = Map[PrimOp, List[Value] => Value](
   PrimOp.PrintLine -> {

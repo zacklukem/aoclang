@@ -65,16 +65,17 @@ def main(): Unit =
       |> trackTime("lower", lower)
       |> trackTime("hoist", hoist)
       |> trackTime("optimize", optimize)
+      |> trackTime("regalloc", regalloc)
 
   val interp = Interp(decls)
 
   decls.foreach { case (name, decl) =>
     if isTest(name) then
       print(s"\u001b[34mTEST $name... \u001b[0m".padTo(60, ' '))
-      val High.Decl.Def(_, body) = decl
+      val Low.Decl.Def(_, body) = decl
       try
         val start = System.nanoTime
-        interp.eval(body)(using Map.empty, List(name))
+        interp.eval(body)(using Array.ofDim(decl.maxStack.get), List(name))
         val time = (System.nanoTime - start) / 1e6
         println(s"\u001b[32mPASS ($time ms)\u001b[0m")
       catch
