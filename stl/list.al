@@ -36,6 +36,9 @@ def map(a, f) = rev(_map(a, f, []))
 def _map([], f, acc) = acc
 def _map(head :: tail, f, acc) = _map(tail, f, f(head) :: acc)
 
+def reduceWith([], v, f) = v
+def reduceWith(head :: tail, v, f) = reduceWith(tail, f(head, v), f)
+
 # TODO: replace with true/false literals
 def contains([], v) = 0 == 1
 def contains(v :: tail, expected) = {

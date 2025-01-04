@@ -1,7 +1,5 @@
 package aoclang
 
-import java.nio.file.{Files, Path}
-
 case class Xcept(msg: String) extends Exception(msg)
 case class XceptWithStack(msg: String, stack: List[Symbol]) extends Exception(msg)
 
@@ -115,63 +113,63 @@ val INTRINSICS = Map[PrimOp, List[Value] => Value](
   PrimOp.Neq -> { case List(a, b) => Value.Lit(a != b) },
   PrimOp.Gt -> {
     case List(Value.Lit(x: Long), Value.Lit(y: Long))     => Value.Lit(x > y)
-    case List(Value.Lit(x: Float), Value.Lit(y: Float))   => Value.Lit(x > y)
-    case List(Value.Lit(x: Long), Value.Lit(y: Float))    => Value.Lit(x > y)
-    case List(Value.Lit(x: Float), Value.Lit(y: Long))    => Value.Lit(x > y)
+    case List(Value.Lit(x: Double), Value.Lit(y: Double)) => Value.Lit(x > y)
+    case List(Value.Lit(x: Long), Value.Lit(y: Double))   => Value.Lit(x > y)
+    case List(Value.Lit(x: Double), Value.Lit(y: Long))   => Value.Lit(x > y)
     case List(Value.Lit(x: String), Value.Lit(y: String)) => Value.Lit(x > y)
     case _                                                => xcept("Invalid types for (>)")
   },
   PrimOp.Lt -> {
     case List(Value.Lit(x: Long), Value.Lit(y: Long))     => Value.Lit(x < y)
-    case List(Value.Lit(x: Float), Value.Lit(y: Float))   => Value.Lit(x < y)
-    case List(Value.Lit(x: Long), Value.Lit(y: Float))    => Value.Lit(x < y)
-    case List(Value.Lit(x: Float), Value.Lit(y: Long))    => Value.Lit(x < y)
+    case List(Value.Lit(x: Double), Value.Lit(y: Double)) => Value.Lit(x < y)
+    case List(Value.Lit(x: Long), Value.Lit(y: Double))   => Value.Lit(x < y)
+    case List(Value.Lit(x: Double), Value.Lit(y: Long))   => Value.Lit(x < y)
     case List(Value.Lit(x: String), Value.Lit(y: String)) => Value.Lit(x < y)
     case _                                                => xcept("Invalid types for (<)")
   },
   PrimOp.Ge -> {
     case List(Value.Lit(x: Long), Value.Lit(y: Long))     => Value.Lit(x >= y)
-    case List(Value.Lit(x: Float), Value.Lit(y: Float))   => Value.Lit(x >= y)
-    case List(Value.Lit(x: Long), Value.Lit(y: Float))    => Value.Lit(x >= y)
-    case List(Value.Lit(x: Float), Value.Lit(y: Long))    => Value.Lit(x >= y)
+    case List(Value.Lit(x: Double), Value.Lit(y: Double)) => Value.Lit(x >= y)
+    case List(Value.Lit(x: Long), Value.Lit(y: Double))   => Value.Lit(x >= y)
+    case List(Value.Lit(x: Double), Value.Lit(y: Long))   => Value.Lit(x >= y)
     case List(Value.Lit(x: String), Value.Lit(y: String)) => Value.Lit(x >= y)
     case _                                                => xcept("Invalid types for (>=)")
   },
   PrimOp.Le -> {
     case List(Value.Lit(x: Long), Value.Lit(y: Long))     => Value.Lit(x <= y)
-    case List(Value.Lit(x: Float), Value.Lit(y: Float))   => Value.Lit(x <= y)
-    case List(Value.Lit(x: Long), Value.Lit(y: Float))    => Value.Lit(x <= y)
-    case List(Value.Lit(x: Float), Value.Lit(y: Long))    => Value.Lit(x <= y)
+    case List(Value.Lit(x: Double), Value.Lit(y: Double)) => Value.Lit(x <= y)
+    case List(Value.Lit(x: Long), Value.Lit(y: Double))   => Value.Lit(x <= y)
+    case List(Value.Lit(x: Double), Value.Lit(y: Long))   => Value.Lit(x <= y)
     case List(Value.Lit(x: String), Value.Lit(y: String)) => Value.Lit(x <= y)
     case _                                                => xcept("Invalid types for (<=)")
   },
   PrimOp.Add -> {
-    case List(Value.Lit(x: Long), Value.Lit(y: Long))   => Value.Lit(x + y)
-    case List(Value.Lit(x: Float), Value.Lit(y: Float)) => Value.Lit(x + y)
-    case List(Value.Lit(x: Long), Value.Lit(y: Float))  => Value.Lit(x + y)
-    case List(Value.Lit(x: Float), Value.Lit(y: Long))  => Value.Lit(x + y)
-    case List(a, b)                                     => xcept(s"Invalid types for (+): $a $b")
+    case List(Value.Lit(x: Long), Value.Lit(y: Long))     => Value.Lit(x + y)
+    case List(Value.Lit(x: Double), Value.Lit(y: Double)) => Value.Lit(x + y)
+    case List(Value.Lit(x: Long), Value.Lit(y: Double))   => Value.Lit(x + y)
+    case List(Value.Lit(x: Double), Value.Lit(y: Long))   => Value.Lit(x + y)
+    case List(a, b)                                       => xcept(s"Invalid types for (+): $a $b")
   },
   PrimOp.Sub -> {
-    case List(Value.Lit(x: Long), Value.Lit(y: Long))   => Value.Lit(x - y)
-    case List(Value.Lit(x: Float), Value.Lit(y: Float)) => Value.Lit(x - y)
-    case List(Value.Lit(x: Long), Value.Lit(y: Float))  => Value.Lit(x - y)
-    case List(Value.Lit(x: Float), Value.Lit(y: Long))  => Value.Lit(x - y)
-    case _                                              => xcept("Invalid types for (-)")
+    case List(Value.Lit(x: Long), Value.Lit(y: Long))     => Value.Lit(x - y)
+    case List(Value.Lit(x: Double), Value.Lit(y: Double)) => Value.Lit(x - y)
+    case List(Value.Lit(x: Long), Value.Lit(y: Double))   => Value.Lit(x - y)
+    case List(Value.Lit(x: Double), Value.Lit(y: Long))   => Value.Lit(x - y)
+    case _                                                => xcept("Invalid types for (-)")
   },
   PrimOp.Mul -> {
-    case List(Value.Lit(x: Long), Value.Lit(y: Long))   => Value.Lit(x * y)
-    case List(Value.Lit(x: Float), Value.Lit(y: Float)) => Value.Lit(x * y)
-    case List(Value.Lit(x: Long), Value.Lit(y: Float))  => Value.Lit(x * y)
-    case List(Value.Lit(x: Float), Value.Lit(y: Long))  => Value.Lit(x * y)
-    case _                                              => xcept("Invalid types for (*)")
+    case List(Value.Lit(x: Long), Value.Lit(y: Long))     => Value.Lit(x * y)
+    case List(Value.Lit(x: Double), Value.Lit(y: Double)) => Value.Lit(x * y)
+    case List(Value.Lit(x: Long), Value.Lit(y: Double))   => Value.Lit(x * y)
+    case List(Value.Lit(x: Double), Value.Lit(y: Long))   => Value.Lit(x * y)
+    case _                                                => xcept("Invalid types for (*)")
   },
   PrimOp.Pow -> {
-    case List(Value.Lit(x: Long), Value.Lit(y: Long))   => Value.Lit(Math.pow(x, y).toLong)
-    case List(Value.Lit(x: Float), Value.Lit(y: Float)) => Value.Lit(Math.pow(x, y).toLong)
-    case List(Value.Lit(x: Long), Value.Lit(y: Float))  => Value.Lit(Math.pow(x, y).toLong)
-    case List(Value.Lit(x: Float), Value.Lit(y: Long))  => Value.Lit(Math.pow(x, y).toLong)
-    case _                                              => xcept("Invalid types for (**)")
+    case List(Value.Lit(x: Long), Value.Lit(y: Long))     => Value.Lit(Math.pow(x, y).toLong)
+    case List(Value.Lit(x: Double), Value.Lit(y: Double)) => Value.Lit(Math.pow(x, y).toLong)
+    case List(Value.Lit(x: Long), Value.Lit(y: Double))   => Value.Lit(Math.pow(x, y).toLong)
+    case List(Value.Lit(x: Double), Value.Lit(y: Long))   => Value.Lit(Math.pow(x, y).toLong)
+    case _                                                => xcept("Invalid types for (**)")
   },
   PrimOp.BAnd -> {
     case List(Value.Lit(x: Long), Value.Lit(y: Long)) => Value.Lit(x & y)
@@ -198,11 +196,11 @@ val INTRINSICS = Map[PrimOp, List[Value] => Value](
     case _                                            => xcept("Invalid types for (/%)")
   },
   PrimOp.DivFloat -> {
-    case List(Value.Lit(x: Long), Value.Lit(y: Long))   => Value.Lit(x.toDouble / y.toDouble)
-    case List(Value.Lit(x: Float), Value.Lit(y: Float)) => Value.Lit(x / y)
-    case List(Value.Lit(x: Long), Value.Lit(y: Float))  => Value.Lit(x.toDouble / y)
-    case List(Value.Lit(x: Float), Value.Lit(y: Long))  => Value.Lit(x / y.toDouble)
-    case _                                              => xcept("Invalid types for (/)")
+    case List(Value.Lit(x: Long), Value.Lit(y: Long))     => Value.Lit(x.toDouble / y.toDouble)
+    case List(Value.Lit(x: Double), Value.Lit(y: Double)) => Value.Lit(x / y)
+    case List(Value.Lit(x: Long), Value.Lit(y: Double))   => Value.Lit(x.toDouble / y)
+    case List(Value.Lit(x: Double), Value.Lit(y: Long))   => Value.Lit(x / y.toDouble)
+    case _                                                => xcept("Invalid types for (/)")
   },
   PrimOp.Mod -> {
     case List(Value.Lit(x: Long), Value.Lit(y: Long)) => Value.Lit(x % y)

@@ -99,6 +99,7 @@ private class LexerInner(source: Source):
 
       case Some(ch) if ch.isIdentStart =>
         sc.consume(_.isUnicodeIdentifierPart)
+        sc.consume(_ == '\'')
         val lexeme = sc.lexeme
         if KEYWORDS.contains(lexeme) then Tok.Key(lexeme) withSpan sc.close
         else Tok.Id(lexeme) withSpan sc.close
