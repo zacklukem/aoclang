@@ -5,6 +5,7 @@ import scala.collection.mutable
 case class State(
     useCount: Map[Symbol, Int],
     lit: Map[LitValue, Symbol] = Map.empty,
+    prim: Map[(PrimOp, List[Symbol]), Symbol] = Map.empty,
     subst: Map[Symbol, Symbol] = Map.empty,
     cnts: Map[Symbol, Tree.LetC] = Map.empty
 ):
@@ -21,6 +22,9 @@ case class State(
 
   def withLit(litValue: LitValue, symbol: Symbol): State =
     copy(lit = lit + (litValue -> symbol))
+
+  def withPrim(op: PrimOp, args: List[Symbol], symbol: Symbol): State =
+    copy(prim = prim + ((op, args) -> symbol))
 
   def withCnt(name: Symbol, cnt: Tree.LetC): State =
     copy(cnts = cnts + (name -> cnt))
@@ -73,9 +77,11 @@ class Optimizer:
 
   private def shrinking(t: Tree)(using state: State): Tree =
     t match
-      // Literal propagation
+      // CSE
       case Tree.LetL(name, value, body) if state.lit.contains(value) =>
         shrinking(body)(using state.withSub(name, state.lit(value)))
+      case Tree.LetP(name, op, args, body) if pure(op) && state.prim.contains((op, args)) =>
+        shrinking(body)(using state.withSub(name, state.prim((op, args))))
 
       // Dead code elimination
       case Tree.LetL(name, value, body) if state.count(name) == 0 =>
@@ -95,7 +101,12 @@ class Optimizer:
       case cnt @ Tree.LetC(name, args, value, body) =>
         Tree.LetC(name, args, shrinking(value), shrinking(body)(using state.withCnt(name, cnt)))
       case Tree.LetP(name, op, args, body) =>
-        Tree.LetP(name, op, args.map(state.sub), shrinking(body))
+        Tree.LetP(
+          name,
+          op,
+          args.map(state.sub),
+          shrinking(body)(using state.withPrim(op, args, name))
+        )
       case Tree.AppF(fn, retC, args) =>
         Tree.AppF(state.sub(fn), state.sub(retC), args.map(state.sub))
       case Tree.AppC(fn, args) =>
