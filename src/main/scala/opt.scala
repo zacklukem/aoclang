@@ -95,7 +95,6 @@ class Optimizer(val decls: mutable.Map[Symbol, LowDecl]):
       case Tree.AppC(fn, args) if fn != Symbol.Ret && state.count(fn) == 1 =>
         val Tree.LetC(_, params, body, _) = state.cnts(fn)
         body.subst(params.zip(args).toMap)
-        shrinking(body)(using state.withSub(params.zip(args)))
 
       case Tree.LetL(name, value, body) =>
         Tree.LetL(name, value, shrinking(body)(using state.withLit(value, name)))

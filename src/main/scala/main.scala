@@ -33,8 +33,16 @@ def isTest(s: Symbol) =
 
 def dumpAll(decls: Map[Symbol, LowDecl]): Unit =
   decls.foreach { case (name, decl) =>
-    decl.pretty(name)
+    if name == "Rand" :@: "next" then decl.pretty(name)
   }
+
+def trackTime[A, B](label: String, f: A => B): A => B =
+  x =>
+    val start = System.nanoTime
+    val res = f(x)
+    val time = (System.nanoTime - start) / 1e6
+    println(s"$label: $time ms")
+    res
 
 @main
 def main(): Unit =
@@ -54,9 +62,9 @@ def main(): Unit =
 
   val decls =
     moduleAsts
-      |> lower
-      |> hoist
-      |> optimize
+      |> trackTime("lower", lower)
+      |> trackTime("hoist", hoist)
+      |> trackTime("optimize", optimize)
 
   val interp = Interp(decls)
 
