@@ -3,6 +3,8 @@ package aoclang
 import scala.collection.mutable
 import High.*
 
+import scala.annotation.tailrec
+
 def pure(prim: PrimOp) = prim match
   case PrimOp.PrintLine | PrimOp.Assert | PrimOp.AssertEq | PrimOp.Store => false
   case _                                                                 => true
@@ -14,7 +16,7 @@ case class State(
     subst: Map[Symbol, Symbol] = Map.empty,
     cnts: Map[Symbol, Tree.LetC] = Map.empty
 ):
-  def count(s: Symbol) = useCount.getOrElse(s, 0)
+  def count(s: Symbol): Int = useCount.getOrElse(s, 0)
 
   def sub(s: Symbol): Symbol =
     subst.getOrElse(s, s)
@@ -72,6 +74,7 @@ class Optimizer(val decls: mutable.Map[Symbol, Decl]):
         Tree.LetP(name, prim, args, inlining(body))
       case t => t
 
+  @tailrec
   private def shrink(t: Tree): Tree =
     val optT = shrinking(t)(using State(census(t)))
     if t == optT then t else shrink(optT)
@@ -121,7 +124,7 @@ class Optimizer(val decls: mutable.Map[Symbol, Decl]):
 
   private def census(t: Tree): Map[Symbol, Int] =
     def census(t: Tree)(using useCount: mutable.Map[Symbol, Int]): Unit =
-      def use(s: Symbol) = useCount.update(s, useCount.getOrElse(s, 0) + 1)
+      def use(s: Symbol): Unit = useCount.update(s, useCount.getOrElse(s, 0) + 1)
 
       t match
         case Tree.AppF(fn, retC, args) =>

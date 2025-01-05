@@ -49,7 +49,7 @@ trait TreeMod:
       case Tree.Raise(value) =>
         Tree.Raise(value)
 
-      case Tree.LetF(name, args, value, body) => ???
+      case Tree.LetF(name, args, value, body) => throw Error()
 
     def subst(subst: Map[Name, Name]): Tree =
       def sub(s: Name): Name = subst.getOrElse(s, s)
@@ -68,33 +68,33 @@ trait TreeMod:
         case Tree.Raise(value)           => Tree.Raise(sub(value))
 
     def pretty(depth: Int = 0): Unit =
-      def line(s: String) = println("  " * depth + s)
+      def line(s: String): Unit = println("  " * depth + s)
 
       this match
         case Tree.AppF(fn, retC, args) =>
-          line(s"appf ${fn}(${args.mkString(",")}) -> ${retC}")
+          line(s"appf $fn(${args.mkString(",")}) -> $retC")
         case Tree.AppC(fn, args) =>
-          line(s"appc ${fn}(${args.mkString(",")})")
+          line(s"appc $fn(${args.mkString(",")})")
         case Tree.LetC(name, args, value, body) =>
-          line(s"letc ${name}(${args.mkString(",")}) = {")
+          line(s"letc $name(${args.mkString(",")}) = {")
           value.pretty(depth + 1)
           line("}")
           body.pretty(depth)
         case LetF(name, args, value, body) =>
-          line(s"letf ${name}(${args.mkString(",")}) = {")
+          line(s"letf $name(${args.mkString(",")}) = {")
           value.pretty(depth + 1)
           line("}")
           body.pretty(depth)
         case Tree.LetL(name, value, body) =>
-          line(s"letl ${name} = ${value}")
+          line(s"letl $name = $value")
           body.pretty(depth)
         case Tree.LetP(name, prim, args, body) =>
-          line(s"letp ${name} = ${prim}(${args.mkString(",")})")
+          line(s"letp $name = $prim(${args.mkString(",")})")
           body.pretty(depth)
         case Tree.If(cond, thenC, elseC) =>
-          line(s"if ${cond} then ${thenC} else ${elseC}")
+          line(s"if $cond then $thenC else $elseC")
         case Tree.Raise(value) =>
-          line(s"raise ${value}")
+          line(s"raise $value")
 
   enum Decl:
     var maxStack: Option[Int] = None

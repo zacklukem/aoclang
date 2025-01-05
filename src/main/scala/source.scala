@@ -15,14 +15,14 @@ class Source(val text: String):
 case class Span(source: Source, start: Int, end: Int):
   def text: String = source.text.substring(start, end)
 
-  def lineColumn: (Int, Int) =
+  private def lineColumn: (Int, Int) =
     val line = source.text.slice(0, start).count(_ == '\n') + 1
     val column = source.text.slice(0, start).lastIndexOf('\n') match
       case -1          => start + 1
       case lastNewline => start - lastNewline
     (line, column)
 
-  def printLineColumn(message: String) =
+  def printLineColumn(message: String): Unit =
     val (line, column) = lineColumn
     println(
       s"$line:$column: $message\n${source.text.split('\n')(line - 1)}\n${" " * (column - 1)}^"

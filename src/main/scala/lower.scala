@@ -1,7 +1,9 @@
 package aoclang
 
-import High.{Tree, letl, letlNone, letc, app, iff, letp};
-import scala.collection.mutable;
+import High.{Tree, app, iff, letc, letl, letlNone, letp}
+
+import scala.annotation.targetName
+import scala.collection.mutable
 
 enum Symbol:
   case Local(id: String)
@@ -33,7 +35,9 @@ enum PrimOp:
   case StringChars, StringSize, StringFromChars
   case ClosureNew
 
-extension (s: String) def :@:(b: String): Symbol = Symbol.Global(List(s, b))
+extension (s: String)
+  @targetName("makeSymbol")
+  def :@:(b: String): Symbol = Symbol.Global(List(s, b))
 
 private def lower_pat_product(p: Seq[(Pat, Symbol)])(
     c: Option[Map[Tok.Id | Tok.Op, Symbol]] => Tree
@@ -189,7 +193,7 @@ private def lower_pat(p: Pat, rhs: Symbol)(
         } { c(None) }
       }
 
-def emit(span: Span, e: String) =
+def emit(span: Span, e: String): Nothing =
   span.printLineColumn("error")
   throw new Exception(e)
 
@@ -211,13 +215,13 @@ def lower(asts: List[(String, List[Decl])]): Map[Symbol, High.Decl] =
   lower.decls.toMap
 
 private class Lower:
-  val modules: mutable.Map[String, Map[String, Symbol]] = mutable.Map()
+  private val modules: mutable.Map[String, Map[String, Symbol]] = mutable.Map()
   val decls: mutable.Map[Symbol, High.Decl] = mutable.Map()
 
   def declare(mod: String, decl: List[Decl]): Unit =
     decl.foreach(declare(mod, _))
 
-  def declare(mod: String, decl: Decl): Unit =
+  private def declare(mod: String, decl: Decl): Unit =
     decl match
       case Decl.Def(name, _, _) =>
         val symbol = Symbol.Global(List(mod, name.span.get.text))
@@ -248,7 +252,7 @@ private class Lower:
             decls(symbol) = lowerDeclGroup(globals, modules.toMap, decl, arity)
       }
 
-  def lowerDeclGroup(
+  private def lowerDeclGroup(
       globals: Map[String, Symbol],
       modules: Map[String, Map[String, Symbol]],
       decls: List[(String, Decl)],
@@ -420,7 +424,7 @@ class LowerExpr(
           c(name)
         )
 
-  def lower_tail(e: Option[Expr])(c: Symbol)(using sym: Map[Tok.Id | Tok.Op, Symbol]): Tree =
+  private def lower_tail(e: Option[Expr])(c: Symbol)(using sym: Map[Tok.Id | Tok.Op, Symbol]): Tree =
     e
       .map(lower_tail(_)(c))
       .getOrElse(letlNone(s => Tree.AppC(c, List(s))))

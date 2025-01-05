@@ -1,7 +1,7 @@
 package aoclang
 
-import aoclang.High as H
-import aoclang.Low as L
+import High as H
+import Low as L
 
 def regalloc(decls: Map[Symbol, H.Decl]): Map[Symbol, L.Decl] =
   decls.map { (name, decl) =>

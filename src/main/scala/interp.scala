@@ -1,7 +1,7 @@
 package aoclang
 
 import scala.annotation.tailrec
-import Low.*;
+import Low.*
 
 enum Value:
   case Tuple(vs: Array[Value])

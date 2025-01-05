@@ -2,7 +2,7 @@ package aoclang
 
 import java.util.UUID
 import scala.collection.mutable
-import High.{Tree, letl, letp, Decl}
+import High.{Decl, Tree, letl, letp}
 
 def hoist(decls: Map[Symbol, Decl]): Map[Symbol, Decl] =
   val hoister = Hoist()
@@ -14,9 +14,9 @@ def hoist(decls: Map[Symbol, Decl]): Map[Symbol, Decl] =
   } ++ hoister.newDecls
 
 private class Hoist:
-  val newDecls = mutable.ListBuffer[(Symbol, Decl)]()
+  val newDecls: mutable.ListBuffer[(Symbol, High.Decl)] = mutable.ListBuffer[(Symbol, Decl)]()
 
-  def inSymbols(t: Tree): Set[Symbol] =
+  private def inSymbols(t: Tree): Set[Symbol] =
     t match
       case Tree.AppF(fn, retC, args) =>
         Set.from(retC :: fn :: args)
@@ -35,7 +35,7 @@ private class Hoist:
       case Tree.Raise(value) =>
         Set(value)
 
-  def outSymbols(t: Tree): Set[Symbol] =
+  private def outSymbols(t: Tree): Set[Symbol] =
     t match
       case Tree.AppF(fn, retC, args) =>
         Set.empty

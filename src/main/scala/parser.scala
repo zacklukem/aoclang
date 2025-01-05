@@ -5,17 +5,17 @@ import scala.collection.mutable
 class Parser(source: Source):
   private val lx = Lexer(source)
 
-  def expectEq(actual: Tok, expected: Tok) =
+  private def expectEq(actual: Tok, expected: Tok): Unit =
     if actual != expected then
       actual.span.get.printLineColumn("error")
       throw new Exception(s"Expected $expected got $actual")
 
-  def parseTopLevel =
+  def parseTopLevel: List[Decl] =
     val decls = mutable.ListBuffer.empty[Decl]
     while lx.peek != Tok.Eof do decls += parseDecl
     decls.toList
 
-  def parseDeclArgList(terminator: Tok = Tok.Key(")")) =
+  private def parseDeclArgList(terminator: Tok = Tok.Key(")")): List[Pat] =
     val args = mutable.ListBuffer.empty[Pat]
     while lx.peek != terminator do
       val name = parsePat
@@ -24,7 +24,7 @@ class Parser(source: Source):
       else expectEq(lx.peek, terminator)
     args.toList
 
-  def parseDecl =
+  private def parseDecl =
     lx.peek match
       case Tok.Key("def") =>
         lx.next
@@ -50,7 +50,7 @@ class Parser(source: Source):
           Decl.Def(name, args, body)
       case tok => emit(tok.span.get, s"Unexpected: $tok")
 
-  def parsePatList(terminator: String = ")"): List[Pat] =
+  private def parsePatList(terminator: String = ")"): List[Pat] =
     val args = mutable.ListBuffer.empty[Pat]
     while lx.peek != Tok.Key(terminator) do
       args += parsePat
@@ -58,7 +58,7 @@ class Parser(source: Source):
       else expectEq(lx.peek, Tok.Key(terminator))
     args.toList
 
-  def parsePat =
+  private def parsePat =
     // TODO: Implement operator precedence
     var lhs = parsePatPrimary
     while lx.peek == Tok.Op("::") do
@@ -67,7 +67,7 @@ class Parser(source: Source):
       lhs = Pat.Cons(lhs, rhs)
     lhs
 
-  def parsePatPrimary: Pat =
+  private def parsePatPrimary: Pat =
     val pat = lx.peek match
       case Tok.Key("(") =>
         val l = lx.next
@@ -94,7 +94,7 @@ class Parser(source: Source):
       Pat.TypeAssert(pat, lx.next.asInstanceOf[Tok.Id])
     else pat
 
-  def parseBlockExpr: Expr =
+  private def parseBlockExpr: Expr =
     val l = lx.next
     expectEq(l, Tok.Key("{"))
 
@@ -111,7 +111,7 @@ class Parser(source: Source):
     expectEq(r, Tok.Key("}"))
     Expr.Block(l.asInstanceOf[Tok.Key], expr, r.asInstanceOf[Tok.Key])
 
-  def parseInBlockExpr: Option[Expr] => Expr =
+  private def parseInBlockExpr: Option[Expr] => Expr =
     lx.peek match
       case Tok.Key("let") =>
         lx.next
@@ -128,7 +128,7 @@ class Parser(source: Source):
           case None       => expr
         }
 
-  def parseSingleExpr: Expr =
+  private def parseSingleExpr: Expr =
     lx.peek match
       case Tok.Key("{") => parseBlockExpr
 
@@ -172,7 +172,7 @@ class Parser(source: Source):
 
       case _ => parsePipe
 
-  def parsePipe =
+  private def parsePipe =
     var lhs = parseBinop(0)
     while lx.peek == Tok.Key("|>") do
       lx.next
@@ -180,7 +180,7 @@ class Parser(source: Source):
       lhs = Expr.App(fn, lhs :: args)
     lhs
 
-  def parseBinop(min: Int): Expr =
+  private def parseBinop(min: Int): Expr =
     // TODO: Implement operator precedence
     var lhs = parseUnop
     while isOp(lx.peek, min) do
@@ -190,14 +190,14 @@ class Parser(source: Source):
       lhs = Expr.App(Expr.Var(op), List(lhs, rhs))
     lhs
 
-  def parseUnop =
+  private def parseUnop =
     if lx.peek.isInstanceOf[Tok.Op] then
       val op = lx.next.asInstanceOf[Tok.Op]
       val rhs = parsePrimaryExpr
       Expr.App(Expr.Var(op), List(rhs))
     else parsePrimaryExpr
 
-  def parseArgList(terminator: String = ")") =
+  private def parseArgList(terminator: String = ")") =
     val args = mutable.ListBuffer.empty[Expr]
     while lx.peek != Tok.Key(terminator) do
       args += parseSingleExpr
@@ -205,7 +205,7 @@ class Parser(source: Source):
       else expectEq(lx.peek, Tok.Key(terminator))
     args.toList
 
-  def parsePrimaryExpr =
+  private def parsePrimaryExpr =
     var expr = lx.peek match
       case Tok.Key("[") =>
         val l = lx.next
