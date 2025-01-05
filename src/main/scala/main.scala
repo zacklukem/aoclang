@@ -44,6 +44,18 @@ def trackTime[A, B](label: String, f: A => B): A => B =
     println(s"$label: ${"%.2f".format(time)} ms")
     res
 
+def load(files: List[Path]) =
+  files.map { path =>
+    val src = Files.readString(path)
+    val modname = path.getFileName.toString.stripSuffix(".al") |> pascalCase
+    modname -> Source(src)
+  }
+
+def parse(files: List[(String, Source)]) =
+  files.map { case (modname, src) =>
+    modname -> Parser(src).parseTopLevel
+  }
+
 @main
 def main(): Unit =
   val stl_root = Path.of("stl")
@@ -53,15 +65,10 @@ def main(): Unit =
       .filter(_.toString.endsWith(".al"))
       .toList
 
-  val moduleAsts = files.map { path =>
-    val src = Files.readString(path)
-    val tree = Parser(Source(src)).parseTopLevel
-    val modname = path.getFileName.toString.stripSuffix(".al") |> pascalCase
-    modname -> tree
-  }
-
   val decls =
-    moduleAsts
+    files
+      |> trackTime("load", load)
+      |> trackTime("parse", parse)
       |> trackTime("lower", lower)
       |> trackTime("hoist", hoist)
       |> trackTime("optimize", optimize)

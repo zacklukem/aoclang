@@ -155,7 +155,11 @@ private def lower_pat(p: Pat, rhs: Symbol)(
       ): Tree =
         pats match
           case Nil =>
-            c(Some(bindings))
+            letp(PrimOp.ListIsEmpty, List(prev)) { is_empty =>
+              iff(is_empty) {
+                c(Some(bindings))
+              } { c(None) }
+            }
           case pat :: tail =>
             letp(PrimOp.ListHead, List(prev)) { wrappedHead =>
               letl(Sym.none) { none =>

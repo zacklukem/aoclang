@@ -81,8 +81,7 @@ class Parser(source: Source):
         val pats = parsePatList("]")
         val r = lx.next
         expectEq(r, Tok.Key("]"))
-        if pats.length == 1 then pats.head
-        else Pat.ListLit(l.asInstanceOf, pats, r.asInstanceOf)
+        Pat.ListLit(l.asInstanceOf, pats, r.asInstanceOf)
       case lit: Tok.Lit =>
         lx.next
         Pat.Lit(lit)
@@ -174,12 +173,12 @@ class Parser(source: Source):
       case _ => parsePipe
 
   def parsePipe =
-    val lhs = parseBinop(0)
-    if lx.peek == Tok.Key("|>") then
+    var lhs = parseBinop(0)
+    while lx.peek == Tok.Key("|>") do
       lx.next
       val Expr.App(fn, args) = parsePrimaryExpr
-      Expr.App(fn, lhs :: args)
-    else lhs
+      lhs = Expr.App(fn, lhs :: args)
+    lhs
 
   def parseBinop(min: Int): Expr =
     // TODO: Implement operator precedence
