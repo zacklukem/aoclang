@@ -41,7 +41,7 @@ def trackTime[A, B](label: String, f: A => B): A => B =
     val start = System.nanoTime
     val res = f(x)
     val time = (System.nanoTime - start) / 1e6
-    println(s"$label: $time ms")
+    println(s"$label: ${"%.2f".format(time)} ms")
     res
 
 @main
@@ -69,19 +69,21 @@ def main(): Unit =
 
   val interp = Interp(decls)
 
-  decls.foreach { case (name, decl) =>
-    if isTest(name) then
+  decls.toSeq
+    .filter((name, _) => isTest(name))
+    .sortBy(_._1.toString)
+    .foreach { case (name, decl) =>
       print(s"\u001b[34mTEST $name... \u001b[0m".padTo(60, ' '))
       val Low.Decl.Def(_, body) = decl
       try
         val start = System.nanoTime
         interp.eval(body)(using Array.ofDim(decl.maxStack.get), List(name))
         val time = (System.nanoTime - start) / 1e6
-        println(s"\u001b[32mPASS ($time ms)\u001b[0m")
+        println(s"\u001b[32mPASS ${"%8.3f".format(time)} ms\u001b[0m")
       catch
         case XceptWithStack(msg, stack) =>
           println(s"\n\u001b[31m\tERROR: $msg\u001b[0m")
           stack.foreach { frame =>
             println(s"\u001b[31m\t\t$frame\u001b[0m")
           }
-  }
+    }
