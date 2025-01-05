@@ -4,8 +4,8 @@ import scala.collection.mutable
 import High.*
 
 def pure(prim: PrimOp) = prim match
-  case PrimOp.PrintLine | PrimOp.Assert => false
-  case _                                => true
+  case PrimOp.PrintLine | PrimOp.Assert | PrimOp.AssertEq | PrimOp.Store => false
+  case _                                                                 => true
 
 case class State(
     useCount: Map[Symbol, Int],

@@ -7,6 +7,7 @@ enum Value:
   case Tuple(vs: Array[Value])
   case ListVal(vs: List[Value])
   case Lit(v: LitValue)
+  case Ref(var v: Value)
   case Closure(fn: Symbol.Global, env: Option[Value])
   case Cnt(args: List[Name], body: Tree)
 
@@ -16,6 +17,7 @@ enum Value:
       case (Tuple(vs1), Tuple(vs2))                 => vs1.sameElements(vs2)
       case (ListVal(vs1), ListVal(vs2))             => vs1 == vs2
       case (Closure(fn1, env1), Closure(fn2, env2)) => fn1 == fn2
+      case (a: Ref, b: Ref)                         => a eq b
       case _                                        => false
 
 class Interp(val decls: Map[Symbol, Decl]):

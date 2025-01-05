@@ -48,6 +48,12 @@ def !(a) = __intrinsic__("Not", a)
 
 def ::(a, b) = __intrinsic__("ListCons", a, b)
 
+def ref(a) = __intrinsic__("Ref", a)
+
+def <-(a, b) = __intrinsic__("Store", a, b)
+
+def @(a) = __intrinsic__("Load", a)
+
 def range(a, b) = ('range, a, b)
 
 def Enumerable.from(('range, a, b)) = ('range, a, b)

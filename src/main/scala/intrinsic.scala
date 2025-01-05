@@ -10,10 +10,25 @@ def intrinsicToString(v: Value): String =
     case Value.Lit(v)         => v.toString
     case Value.ListVal(l)     => l.map(intrinsicToString).mkString("[", ", ", "]")
     case Value.Closure(fn, _) => s"<$fn>"
+    case Value.Ref(v)         => intrinsicToString(v)
     case Value.Tuple(tup)     => tup.map(intrinsicToString).mkString("(", ", ", ")")
     case Value.Cnt(_, _)      => s"<cnt>"
 
 val INTRINSICS = Map[PrimOp, List[Value] => Value](
+  PrimOp.Ref -> {
+    case List(v) => Value.Ref(v)
+    case _       => xcept("Invalid types for (Stl.ref)")
+  },
+  PrimOp.Store -> {
+    case List(v: Value.Ref, x) =>
+      v.v = x
+      Value.Lit(Sym.none)
+    case _ => xcept("Invalid types for (Stl.store)")
+  },
+  PrimOp.Load -> {
+    case List(v: Value.Ref) => v.v
+    case _                  => xcept("Invalid types for (Stl.load)")
+  },
   PrimOp.PrintLine -> {
     case List(a) =>
       println(intrinsicToString(a))

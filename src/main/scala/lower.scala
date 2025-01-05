@@ -25,6 +25,7 @@ object Symbol:
 
 enum PrimOp:
   case PrintLine, Assert, AssertEq, HashCode
+  case Ref, Store, Load
   case Eq, Neq, Lt, Gt, Le, Ge, Add, Sub, Mul, DivInt, DivFloat, Mod, Pow, BAnd, BOr, Xor, Shl, Shr,
     Concat, Not
   case ListNew, ListHead, ListTail, ListIs, ListIsEmpty, ListToTuple, ListCons

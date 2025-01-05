@@ -60,7 +60,7 @@ val KEYWORDS =
   )
 
 val OPERATOR_CHARS =
-  Set('+', '-', '*', '/', '=', '!', '<', '>', '&', '|', '^', '~', '%', '?', ':', '.', ',')
+  Set('+', '-', '*', '/', '=', '!', '<', '>', '&', '|', '^', '~', '%', '?', ':', '.', ',', '@')
 
 extension (c: Char)
   private def isOperator: Boolean = OPERATOR_CHARS.contains(c)
