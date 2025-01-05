@@ -10,7 +10,7 @@ def put(('set, node), value) = {
 }
 
 def _put(node, hash, value, 0) = {
-  if List.contains(node, value) {
+  if Enum.contains(node, value) {
     node
   } else {
     value :: node
@@ -34,7 +34,7 @@ def has(('set, node), value) = {
 }
 
 def _has(node: List, hash, value, 0) = {
-  List.contains(node, value)
+  Enum.contains(node, value)
 }
 
 def _has(node: Tuple, hash, value, depth) = {

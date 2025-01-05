@@ -62,7 +62,7 @@ val INTRINSICS = Map[PrimOp, List[Value] => Value](
     case _                               => xcept("Invalid types for (::)")
   },
   PrimOp.ListHead -> {
-    case List(Value.ListVal(head :: _)) => head
+    case List(Value.ListVal(head :: _)) => Value.Tuple(Array(Value.Lit(Sym.some), head))
     case List(Value.ListVal(Nil))       => Value.Lit(Sym.none)
     case _                              => xcept("Invalid types for (List.head)")
   },

@@ -12,6 +12,11 @@ enum Decl(span: Span) extends Node(span):
       args: List[Pat],
       body: Expr
   ) extends Decl(name.span.get ++ body.span)
+  case AbsoluteDef(
+      name: List[Tok.Id],
+      args: List[Pat],
+      body: Expr
+  ) extends Decl(name.head.span.get ++ body.span)
 
 enum Pat(span: Span) extends Node(span):
   case Bind(name: Tok.Id) extends Pat(name.span.get)

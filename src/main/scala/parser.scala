@@ -29,13 +29,25 @@ class Parser(source: Source):
       case Tok.Key("def") =>
         lx.next
         val name = lx.next.asInstanceOf[Tok.Id | Tok.Op]
-        expectEq(lx.next, Tok.Key("("))
-        val args = parseDeclArgList()
-        expectEq(lx.next, Tok.Key(")"))
-        expectEq(lx.next, Tok.Key("="))
-        val body: Expr = parseSingleExpr
+        if lx.peek == Tok.Key(".") then
+          lx.next
+          val protocol = lx.next.asInstanceOf[Tok.Id]
 
-        Decl.Def(name, args, body)
+          expectEq(lx.next, Tok.Key("("))
+          val args = parseDeclArgList()
+          expectEq(lx.next, Tok.Key(")"))
+          expectEq(lx.next, Tok.Key("="))
+          val body: Expr = parseSingleExpr
+
+          Decl.AbsoluteDef(List(name.asInstanceOf[Tok.Id], protocol), args, body)
+        else
+          expectEq(lx.next, Tok.Key("("))
+          val args = parseDeclArgList()
+          expectEq(lx.next, Tok.Key(")"))
+          expectEq(lx.next, Tok.Key("="))
+          val body: Expr = parseSingleExpr
+
+          Decl.Def(name, args, body)
       case tok => emit(tok.span.get, s"Unexpected: $tok")
 
   def parsePatList(terminator: String = ")"): List[Pat] =

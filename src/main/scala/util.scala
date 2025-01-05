@@ -5,5 +5,6 @@ case class Sym(name: String):
 
 object Sym:
   val none = Sym("none")
+  val some = Sym("some")
 
 extension [A](x: A) def |>[B](f: A => B): B = f(x)

@@ -103,19 +103,23 @@ private def lower_pat(p: Pat, rhs: Symbol)(
     case Pat.Cons(head, tail) =>
       letp(PrimOp.ListIs, List(rhs)) { is_list =>
         iff(is_list) {
-          letp(PrimOp.ListHead, List(rhs)) { headVal =>
+          letp(PrimOp.ListHead, List(rhs)) { wrappedHeadVal =>
             letl(Sym.none) { nonel =>
-              letp(PrimOp.Neq, List(headVal, nonel)) { head_is_some =>
+              letp(PrimOp.Neq, List(wrappedHeadVal, nonel)) { head_is_some =>
                 iff(head_is_some) {
-                  lower_pat(head, headVal) {
-                    case Some(head_bindings) =>
-                      letp(PrimOp.ListTail, List(rhs)) { tailVal =>
-                        lower_pat(tail, tailVal) {
-                          case Some(tail_bindings) => c(Some(head_bindings ++ tail_bindings))
-                          case None                => c(None)
-                        }
+                  letl(1.toLong) { one =>
+                    letp(PrimOp.TupleGet, List(wrappedHeadVal, one)) { headVal =>
+                      lower_pat(head, headVal) {
+                        case Some(head_bindings) =>
+                          letp(PrimOp.ListTail, List(rhs)) { tailVal =>
+                            lower_pat(tail, tailVal) {
+                              case Some(tail_bindings) => c(Some(head_bindings ++ tail_bindings))
+                              case None                => c(None)
+                            }
+                          }
+                        case None => c(None)
                       }
-                    case None => c(None)
+                    }
                   }
                 } { c(None) }
               }
@@ -152,13 +156,25 @@ private def lower_pat(p: Pat, rhs: Symbol)(
           case Nil =>
             c(Some(bindings))
           case pat :: tail =>
-            letp(PrimOp.ListHead, List(prev)) { head =>
-              lower_pat(pat, head) {
-                case Some(head_bindings) =>
-                  letp(PrimOp.ListTail, List(prev)) { tailVal =>
-                    reduce_pats(tail, tailVal, bindings ++ head_bindings)
+            letp(PrimOp.ListHead, List(prev)) { wrappedHead =>
+              letl(Sym.none) { none =>
+                letp(PrimOp.Neq, List(wrappedHead, none)) { has_head =>
+                  iff(has_head) {
+                    letl(1.toLong) { one =>
+                      letp(PrimOp.TupleGet, List(wrappedHead, one)) { head =>
+                        lower_pat(pat, head) {
+                          case Some(head_bindings) =>
+                            letp(PrimOp.ListTail, List(prev)) { tailVal =>
+                              reduce_pats(tail, tailVal, bindings ++ head_bindings)
+                            }
+                          case None => c(None)
+                        }
+                      }
+                    }
+                  } {
+                    c(None)
                   }
-                case None => c(None)
+                }
               }
             }
 
@@ -175,7 +191,18 @@ def emit(span: Span, e: String) =
 def lower(asts: List[(String, List[Decl])]): Map[Symbol, High.Decl] =
   val lower = Lower()
   asts.foreach({ case (mod, decls) => lower.declare(mod, decls) })
-  asts.foreach({ case (mod, decls) => lower.lower(mod, decls) })
+  asts
+    .flatMap({ case (mod, decls) =>
+      decls.map {
+        case decl: Decl.Def => (mod, mod, decl)
+        case Decl.AbsoluteDef(List(Tok.Id(realMod), name), args, body) =>
+          (realMod, mod, Decl.Def(name, args, body))
+      }
+    })
+    .groupBy(_._1)
+    .foreach({ (mod, decls) =>
+      lower.lower(mod, decls.map({ case (_, importMod, decl) => (importMod, decl) }))
+    })
   lower.decls.toMap
 
 private class Lower:
@@ -193,41 +220,58 @@ private class Lower:
           case None      => Some(Map(name.span.get.text -> symbol))
           case Some(map) => Some(map + (name.span.get.text -> symbol))
         }
+      case Decl.AbsoluteDef(List(Tok.Id(mod), Tok.Id(name)), args, body) =>
+        val symbol = Symbol.Global(List(mod, name))
+        modules.updateWith(mod) {
+          case None      => Some(Map(name -> symbol))
+          case Some(map) => Some(map + (name -> symbol))
+        }
 
-  def lower(mod: String, decl: List[Decl]): Unit =
-    val globals = modules("List") ++ modules("Stl") ++ modules(mod)
+  def lower(mod: String, decl: List[(String, Decl)]): Unit =
+    val globals = modules("Stl")
 
     decl
-      .groupBy { case Decl.Def(name, _, _) => name.span.get.text }
-      .foreach { case (name, decl) =>
+      .groupBy { case (_, Decl.Def(name, _, _)) => name.span.get.text }
+      .foreach { (name, decl) =>
         decl.head match
-          case Decl.Def(_, args, _) =>
+          case (_, Decl.Def(_, args, _)) =>
             val arity = args.length
             val symbol = modules(mod)(name)
 
-            assert(decl.forall { case Decl.Def(_, declArgs, _) => declArgs.length == arity })
+            assert(decl.forall { case (_, Decl.Def(_, declArgs, _)) => declArgs.length == arity })
 
-            decls(symbol) = LowerExpr(globals, modules.toMap).lowerDeclGroup(decl, arity)
+            decls(symbol) = lowerDeclGroup(globals, modules.toMap, decl, arity)
       }
 
-class LowerExpr(
-    val globals: Map[String, Symbol],
-    val modules: Map[String, Map[String, Symbol]]
-):
-  def lowerDeclGroup(decls: List[Decl], arity: Int): High.Decl =
+  def lowerDeclGroup(
+      globals: Map[String, Symbol],
+      modules: Map[String, Map[String, Symbol]],
+      decls: List[(String, Decl)],
+      arity: Int
+  ): High.Decl =
     val argsSym = (1 to arity).map { idx => Symbol.local(s"_arg${idx}_") }.toList
 
-    val fail = letl("match error")(Tree.Raise(_))
-    val e = decls.foldRight(fail) { case (Decl.Def(name, pat, body: Expr), next) =>
+    def fail = letp(PrimOp.TupleNew, argsSym) { args =>
+      letl("match error: ") { msg =>
+        letp(PrimOp.Concat, List(msg, args))(Tree.Raise(_))
+      }
+    }
+    val e = decls.foldRight(fail) { case ((importMod, Decl.Def(name, pat, body: Expr)), next) =>
+      val lower = LowerExpr(globals ++ modules(importMod), modules)
       lower_pat_product(pat.zip(argsSym)) {
         case Some(bindings) =>
-          lower_tail(body)(Symbol.Ret)(using bindings)
+          lower.lower_tail(body)(Symbol.Ret)(using bindings)
         case None =>
           next
       }
     }
 
     High.Decl.Def(argsSym, e)
+
+class LowerExpr(
+    val globals: Map[String, Symbol],
+    val modules: Map[String, Map[String, Symbol]]
+):
 
   def lower(
       e: Option[Expr]
@@ -254,7 +298,9 @@ class LowerExpr(
             case Some(bindings) =>
               lower(body)(c)(using sym ++ bindings)
             case None =>
-              letl("match error")(Tree.Raise(_))
+              letl("match error: ") { msg =>
+                letp(PrimOp.Concat, List(msg, value))(Tree.Raise(_))
+              }
           }
         }
 
@@ -325,7 +371,10 @@ class LowerExpr(
         val res = Symbol.local
         letc(List(res), c(res)) { c =>
           lower(expr) { expr =>
-            val fail = letl("match error")(Tree.Raise(_))
+            def fail = letl("match expr error: ") { msg =>
+              letp(PrimOp.Concat, List(msg, expr))(Tree.Raise(_))
+            }
+
             cases.foldRight(fail) { case (MatchCase(pat, body), next) =>
               lower_pat(pat, expr) {
                 case Some(bindings) =>
@@ -347,7 +396,11 @@ class LowerExpr(
             case Some(bindings) =>
               lower_tail(body)(Symbol.Ret)(using sym ++ bindings)
             case None =>
-              letl("match error")(Tree.Raise(_))
+              letp(PrimOp.TupleNew, argSyms) { args =>
+                letl("lambda match error: ") { msg =>
+                  letp(PrimOp.Concat, List(msg, args))(Tree.Raise(_))
+                }
+              }
           },
           c(name)
         )
@@ -367,7 +420,9 @@ class LowerExpr(
             case Some(bindings) =>
               lower_tail(body)(c)(using sym ++ bindings)
             case None =>
-              letl("match error")(Tree.Raise(_))
+              letl("match error: ") { msg =>
+                letp(PrimOp.Concat, List(msg, value))(Tree.Raise(_))
+              }
           }
         }
 
@@ -430,7 +485,10 @@ class LowerExpr(
 
       case Expr.Match(expr, _, cases, _) =>
         lower(expr) { expr =>
-          val fail = letl("match error")(Tree.Raise(_))
+          def fail = letl("match expr error: ") { msg =>
+            letp(PrimOp.Concat, List(msg, expr))(Tree.Raise(_))
+          }
+
           cases.foldRight(fail) { case (MatchCase(pat, body), next) =>
             lower_pat(pat, expr) {
               case Some(bindings) =>
@@ -451,7 +509,11 @@ class LowerExpr(
             case Some(bindings) =>
               lower_tail(body)(Symbol.Ret)(using sym ++ bindings)
             case None =>
-              letl("match error")(Tree.Raise(_))
+              letp(PrimOp.TupleNew, argSyms) { args =>
+                letl("lambda match error: ") { msg =>
+                  letp(PrimOp.Concat, List(msg, args))(Tree.Raise(_))
+                }
+              }
           },
           cf(name)
         )
