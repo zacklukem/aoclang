@@ -10,6 +10,14 @@ enum Value:
   case Closure(fn: Symbol.Global, env: Option[Value])
   case Cnt(args: List[Name], body: Tree)
 
+  override def equals(obj: Any): Boolean =
+    (this, obj) match
+      case (Lit(v1), Lit(v2))                       => v1 == v2
+      case (Tuple(vs1), Tuple(vs2))                 => vs1.sameElements(vs2)
+      case (ListVal(vs1), ListVal(vs2))             => vs1 == vs2
+      case (Closure(fn1, env1), Closure(fn2, env2)) => fn1 == fn2
+      case _                                        => false
+
 class Interp(val decls: Map[Symbol, Decl]):
   private def evalNonTail(e: Tree)(using frame: Array[Value], stack: List[Name]): Value =
     eval(e)

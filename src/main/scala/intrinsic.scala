@@ -25,6 +25,12 @@ val INTRINSICS = Map[PrimOp, List[Value] => Value](
     case List(Value.Lit(false)) => xcept("Assertion failed")
     case _                      => xcept("Invalid types for (Stl.assert)")
   },
+  PrimOp.AssertEq -> {
+    case List(a, b) if a == b => Value.Lit(Sym.none)
+    case List(a, b) =>
+      xcept(s"Assertion failed: ${intrinsicToString(a)} != ${intrinsicToString(b)}")
+    case _ => xcept("Invalid types for (Stl.assert)")
+  },
   PrimOp.HashCode -> {
     case List(x) => Value.Lit(x.hashCode.toLong)
     case _       => xcept("Invalid types for (Stl.hash_code)")

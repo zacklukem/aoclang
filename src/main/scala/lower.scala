@@ -24,7 +24,7 @@ object Symbol:
     Local(s"$name$idx")
 
 enum PrimOp:
-  case PrintLine, Assert, HashCode
+  case PrintLine, Assert, AssertEq, HashCode
   case Eq, Neq, Lt, Gt, Le, Ge, Add, Sub, Mul, DivInt, DivFloat, Mod, Pow, BAnd, BOr, Xor, Shl, Shr,
     Concat, Not
   case ListNew, ListHead, ListTail, ListIs, ListIsEmpty, ListToTuple, ListCons
@@ -342,7 +342,17 @@ class LowerExpr(
           }
         }
 
-      case Expr.Field(Expr.Var(Tok.Id(name)), Tok.Id(field)) =>
+      case Expr.Field(Expr.Var(modNm @ Tok.Id(name)), declNm @ Tok.Id(field)) =>
+        modules.get(name) match
+          case Some(mod) =>
+            mod.get(field) match
+              case Some(s) => c(s)
+              case None =>
+                emit(
+                  declNm.span.get,
+                  s"undefined field ${declNm.span.get.text} in module ${modNm.span.get.text}"
+                )
+          case None => emit(modNm.span.get, s"undefined module ${modNm.span.get.text}")
         c(modules(name)(field))
 
       case Expr.Var(name) =>

@@ -2,6 +2,8 @@ def println(a) = __intrinsic__("PrintLine", a)
 
 def assert(a) = __intrinsic__("Assert", a)
 
+def assert_eq(a, b) = __intrinsic__("AssertEq", a, b)
+
 def hash_code(a) = __intrinsic__("HashCode", a)
 
 def ==(a, b) = __intrinsic__("Eq", a, b)
