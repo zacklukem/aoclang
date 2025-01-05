@@ -3,7 +3,7 @@ package aoclang
 import scala.jdk.CollectionConverters.*
 import java.nio.file.{Files, Path}
 
-def print_tree(obj: Any, depth: Int = 0, paramName: Option[String] = None): Unit =
+def printTree(obj: Any, depth: Int = 0, paramName: Option[String] = None): Unit =
   val indent = "| " * depth
   val prettyName = paramName.fold("")(x => s"$x: ")
   val ptype = obj match
@@ -15,12 +15,12 @@ def print_tree(obj: Any, depth: Int = 0, paramName: Option[String] = None): Unit
 
   obj match
     case seq: Iterable[Any] =>
-      seq.foreach(print_tree(_, depth + 1))
+      seq.foreach(printTree(_, depth + 1))
     case obj: Product =>
-      if obj.productArity == 1 then print_tree(obj.productIterator.next, depth + 1, None)
+      if obj.productArity == 1 then printTree(obj.productIterator.next, depth + 1, None)
       else
         (obj.productIterator zip obj.productElementNames)
-          .foreach { case (subObj, paramName) => print_tree(subObj, depth + 1, Some(paramName)) }
+          .foreach { case (subObj, paramName) => printTree(subObj, depth + 1, Some(paramName)) }
     case _ =>
 
 def pascalCase(s: String) =
