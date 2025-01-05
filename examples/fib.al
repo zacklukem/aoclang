@@ -7,5 +7,5 @@ def fibrec(a, b, n) = {
 def fib(k) = fibrec(0, 1, k)
 
 def main() = {
-  1000 |> fib |> println
+  println(fib(1000))
 }

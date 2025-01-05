@@ -38,6 +38,6 @@ case class Span(source: Source, start: Int, end: Int):
 
   @targetName("concat")
   def ++(other: Span): Span =
-    Span(source, start, other.end)
+    Span(source, start.min(other.start), end.max(other.end))
 
 object NullSpan extends Span(null, 0, 0)

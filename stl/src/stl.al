@@ -46,8 +46,6 @@ def ++(a, b) = __intrinsic__("Concat", a, b)
 
 def !(a) = __intrinsic__("Not", a)
 
-def |>(a, f) = f(a)
-
 def ::(a, b) = __intrinsic__("ListCons", a, b)
 
 def range(a, b) = ('range, a, b)

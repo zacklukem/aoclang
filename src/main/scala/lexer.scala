@@ -55,7 +55,8 @@ val KEYWORDS =
     ":",
     ",",
     ".",
-    "=>"
+    "=>",
+    "|>"
   )
 
 val OPERATOR_CHARS =

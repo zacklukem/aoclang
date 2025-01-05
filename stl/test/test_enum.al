@@ -20,7 +20,7 @@ def test_map() = {
     f(x)
   }
 
-  assert(Enum.map([], addOne)  == [])
+  assert(Enum.map([], addOne) == [])
   assert(Enum.map([0], addOne) == [1])
   assert(Enum.map([0, 1], addOne) == [1, 2])
 }

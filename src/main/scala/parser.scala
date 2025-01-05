@@ -171,7 +171,15 @@ class Parser(source: Source):
 
         Expr.If(cond, thenExpr, elseExpr)
 
-      case _ => parseBinop
+      case _ => parsePipe
+
+  def parsePipe =
+    val lhs = parseBinop
+    if lx.peek == Tok.Key("|>") then
+      lx.next
+      val Expr.App(fn, args) = parsePrimaryExpr
+      Expr.App(fn, lhs :: args)
+    else lhs
 
   def parseBinop =
     // TODO: Implement operator precedence
