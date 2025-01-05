@@ -19,12 +19,20 @@ def _ins(t, t' :: ts) =
 
 def _mk(ts) = ('prio_queue, ts)
 
-def empty() = ('prio_queue, [])
-def isEmpty(('prio_queue, ts)) = ts == []
+def new() = ('prio_queue, [])
+def is_empty(('prio_queue, ts)) = ts == []
+def is(('prio_queue, ts)) = 1 == 1
+def is(_) = 1 == 0
 
-def insert(('prio_queue, ts), prio, val) = {
+def enqueue(('prio_queue, ts), prio, val) = {
   let x = (prio, val)
   _mk(_ins((x, 0, []), ts))
+}
+
+def dequeue(('prio_queue, ts)) = {
+  let min = _min(ts)
+  let q = _mk(_delete_min(ts))
+  (q, min)
 }
 
 def meld(('prio_queue, ts1), ('prio_queue, ts2)) = _mk(_meld(ts1, ts2))
@@ -42,11 +50,11 @@ def _meld(t1 :: ts1, t2 :: ts2) =
   }
 
 # returns (prio, elem) or 'none
-def findMin(('prio_queue, ts)) = _findMin(ts)
-def _findMin([]) = 'none
-def _findMin([t]) = _root(t)
-def _findMin(t :: ts) = {
-  let x = _findMin(ts)
+def min(('prio_queue, ts)) = _min(ts)
+def _min([]) = 'none
+def _min([t]) = _root(t)
+def _min(t :: ts) = {
+  let x = _min(ts)
   if _leq(_root(t), x) {
     _root(t)
   } else {
@@ -54,16 +62,16 @@ def _findMin(t :: ts) = {
   }
 }
 
-def deleteMin(('prio_queue, ts)) = _mk(_deleteMin(ts))
-def _deleteMin([]) = 'none
-def _deleteMin(ts) = {
-  let ((x, r, c), ts) = _getMin(ts)
+def delete_min(('prio_queue, ts)) = _mk(_delete_min(ts))
+def _delete_min([]) = PrioQueue.new()
+def _delete_min(ts) = {
+  let ((x, r, c), ts) = _get_min(ts)
   _meld(Enum.rev(c), ts)
 }
 
-def _getMin([t]) = (t, [])
-def _getMin(t :: ts) = {
-  let (t', ts') = _getMin(ts)
+def _get_min([t]) = (t, [])
+def _get_min(t :: ts) = {
+  let (t', ts') = _get_min(ts)
   if _leq(_root(t), _root(t')) {
     (t, ts)
   } else {
@@ -71,14 +79,8 @@ def _getMin(t :: ts) = {
   }
 }
 
-def _print(('prio_queue, ts)) = {
-  println("root")
-  __print(ts, "  ")
-}
-def __print(ts, indent) = {
-  ts |> Enum.foreach(/t/ {
-    let (x, r, c) = t
-    println(indent ++ x)
-    __print(c, indent ++ "  ")
-  })
-}
+def Enumerable.from(q: PrioQueue) = q
+def Enumerable.next(q: PrioQueue) = match PrioQueue.dequeue(q) {
+    (q, 'none) => (q, 'none),
+    (q, v) => (q, ('some, v)),
+  }
