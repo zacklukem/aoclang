@@ -174,19 +174,20 @@ class Parser(source: Source):
       case _ => parsePipe
 
   def parsePipe =
-    val lhs = parseBinop
+    val lhs = parseBinop(0)
     if lx.peek == Tok.Key("|>") then
       lx.next
       val Expr.App(fn, args) = parsePrimaryExpr
       Expr.App(fn, lhs :: args)
     else lhs
 
-  def parseBinop =
+  def parseBinop(min: Int): Expr =
     // TODO: Implement operator precedence
     var lhs = parseUnop
-    while lx.peek.isInstanceOf[Tok.Op] do
+    while isOp(lx.peek, min) do
       val op = lx.next.asInstanceOf[Tok.Op]
-      val rhs = parseUnop
+      val min = prec(op) + assoc(op)
+      val rhs = parseBinop(min)
       lhs = Expr.App(Expr.Var(op), List(lhs, rhs))
     lhs
 
@@ -249,3 +250,25 @@ class Parser(source: Source):
               expr = Expr.TupleField(expr, num)
 
     expr
+
+def isOp(op: Tok, min: Int) =
+  op match
+    case op: Tok.Op => prec(op) >= min
+    case _          => false
+
+def prec(op: Tok.Op) = op.value match
+  case "!=" | "=="             => 1
+  case "<" | ">" | "<=" | ">=" => 2
+  case "++" | "--"             => 3
+  case "|"                     => 4
+  case "^"                     => 5
+  case "&"                     => 6
+  case "<<" | ">>"             => 7
+  case "+" | "-"               => 8
+  case "*" | "/" | "/%" | "%"  => 9
+  case "**"                    => 10
+  case _                       => 0
+
+def assoc(op: Tok.Op) = op.value match
+  case "::" => 0
+  case _    => 1
