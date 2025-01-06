@@ -32,7 +32,8 @@ enum PrimOp:
     Concat, Not
   case ListNew, ListHead, ListTail, ListIs, ListIsEmpty, ListToTuple, ListCons
   case TupleNew, TupleGet, TupleIs, TupleSize, TuplePut
-  case StringChars, StringSize, StringFromChars, StringSplit
+  case StringChars, StringSize, StringFromChars, StringSplit, StringFromInt
+  case IntIs, IntFromString
   case ClosureNew
 
 extension (s: String)

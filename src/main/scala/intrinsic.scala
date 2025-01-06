@@ -66,6 +66,10 @@ val INTRINSICS = Map[PrimOp, List[Value] => Value](
     case List(Value.Lit(s: String)) => Value.Lit(s.length.toLong)
     case _                          => xcept("Invalid types for (String.size)")
   },
+  PrimOp.StringFromInt -> {
+    case List(Value.Lit(i: Long)) => Value.Lit(i.toString)
+    case _                        => xcept("Invalid types for (String.from_int)")
+  },
   PrimOp.StringFromChars -> {
     case List(Value.ListVal(chars)) =>
       chars.map {
@@ -79,6 +83,16 @@ val INTRINSICS = Map[PrimOp, List[Value] => Value](
     case List(Value.Lit(s: String), Value.Lit(delim: String)) =>
       s.split(delim).map(Value.Lit.apply).toList |> Value.ListVal.apply
     case _ => xcept("Invalid types for (String.split)")
+  },
+  PrimOp.IntIs -> {
+    case List(Value.Lit(_: Long)) => Value.Lit(true)
+    case _                        => Value.Lit(false)
+  },
+  PrimOp.IntFromString -> {
+    case List(Value.Lit(s: String)) =>
+      try Value.Lit(s.toLong)
+      catch case e => Value.Lit(Sym.none)
+    case _ => xcept("Invalid types for (Int.from_string)")
   },
   PrimOp.ListNew -> { args =>
     Value.ListVal(args)
