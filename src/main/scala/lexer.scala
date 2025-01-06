@@ -62,6 +62,25 @@ val KEYWORDS =
 val OPERATOR_CHARS =
   Set('+', '-', '*', '/', '=', '!', '<', '>', '&', '|', '^', '~', '%', '?', ':', '.', ',', '@')
 
+def cleanEscape(s: String) =
+  val sb = new StringBuilder
+  var i = 0
+  while i < s.length do
+    val c = s.charAt(i)
+    if c == '\\' then
+      i += 1
+      val c2 = s.charAt(i)
+      c2 match
+        case 'n' => sb.append('\n')
+        case 'r' => sb.append('\r')
+        case 't' => sb.append('\t')
+        case 'b' => sb.append('\b')
+        case 'f' => sb.append('\f')
+        case c2  => sb.append(c2)
+    else sb.append(c)
+    i += 1
+  sb.toString
+
 extension (c: Char)
   private def isOperator: Boolean = OPERATOR_CHARS.contains(c)
   private def isIdentStart: Boolean = c.isUnicodeIdentifierStart || c == '_'
@@ -102,8 +121,11 @@ private class LexerInner(source: Source):
         sc.consume(_.isUnicodeIdentifierPart)
         sc.consume(_ == '\'')
         val lexeme = sc.lexeme
-        if KEYWORDS.contains(lexeme) then Tok.Key(lexeme) withSpan sc.close
-        else Tok.Id(lexeme) withSpan sc.close
+        lexeme match
+          case "true"                              => Tok.Lit(true) withSpan sc.close
+          case "false"                             => Tok.Lit(false) withSpan sc.close
+          case lexeme if KEYWORDS.contains(lexeme) => Tok.Key(lexeme) withSpan sc.close
+          case _                                   => Tok.Id(lexeme) withSpan sc.close
 
       case Some(ch) if ch.isDigit =>
         sc.consume(_.isDigit)
@@ -115,9 +137,11 @@ private class LexerInner(source: Source):
 
       case Some(ch) if ch == '"' =>
         sc.next
-        sc.consume(_ != '"')
-        val contents = sc.lexeme.substring(1)
-        sc.next
+        while sc.peek.exists(_ != '"') do
+          if sc.peek.contains('\\') then sc.next
+          sc.next
+        val contents = cleanEscape(sc.lexeme.substring(1))
+        assert(sc.next.contains('"'))
         Tok.Lit(contents) withSpan sc.close
 
       case Some(ch) => throw RuntimeException(s"unexpected character: $ch")
