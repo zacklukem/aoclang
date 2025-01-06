@@ -75,6 +75,11 @@ val INTRINSICS = Map[PrimOp, List[Value] => Value](
         |> Value.Lit.apply
     case _ => xcept("Invalid types for (String.from_chars)")
   },
+  PrimOp.StringSplit -> {
+    case List(Value.Lit(s: String), Value.Lit(delim: String)) =>
+      s.split(delim).map(Value.Lit.apply).toList |> Value.ListVal.apply
+    case _ => xcept("Invalid types for (String.split)")
+  },
   PrimOp.ListNew -> { args =>
     Value.ListVal(args)
   },
