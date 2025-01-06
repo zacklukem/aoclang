@@ -1,5 +1,7 @@
 package aoclang
 
+import scopt.OParser
+
 import scala.jdk.CollectionConverters.*
 import java.nio.file.{Files, Path}
 
@@ -36,44 +38,27 @@ def dumpAll(decls: Map[Symbol, High.Decl]): Unit =
     if name == "Rand" :@: "next" then decl.pretty(name)
   }
 
-def trackTime[A, B](label: String, f: A => B): A => B =
+def trackTime[A, B](label: String, f: A => B)(using opt: Config): A => B =
   x =>
     val start = System.nanoTime
     val res = f(x)
     val time = (System.nanoTime - start) / 1e6
-    println(s"$label: ${"%.2f".format(time)} ms")
+    if opt.print_times then println(s"$label: ${"%.2f".format(time)} ms")
     res
 
-def load(files: List[Path]) =
+def load(files: List[Path])(using opt: Config) =
   files.map { path =>
     val src = Files.readString(path)
     val modname = path.getFileName.toString.stripSuffix(".al") |> pascalCase
     modname -> Source(src)
   }
 
-def parse(files: List[(String, Source)]) =
+def parse(files: List[(String, Source)])(using opt: Config) =
   files.map { case (modname, src) =>
     modname -> Parser(src).parseTopLevel
   }
 
-@main
-def main(): Unit =
-  val stl_root = Path.of("stl")
-  val examples = Path.of("examples")
-  val files =
-    (Files.walk(stl_root).iterator().asScala ++ Files.walk(examples).iterator().asScala)
-      .filter(_.toString.endsWith(".al"))
-      .toList
-
-  val decls =
-    files
-      |> trackTime("load", load)
-      |> trackTime("parse", parse)
-      |> trackTime("lower", lower)
-      |> trackTime("hoist", hoist)
-      |> trackTime("optimize", optimize)
-      |> trackTime("regalloc", regalloc)
-
+def interpretTests(decls: Map[Symbol, Low.Decl])(using opt: Config): Unit =
   val interp = Interp(decls)
 
   decls.toSeq
@@ -94,3 +79,62 @@ def main(): Unit =
             println(s"\u001b[31m\t\t$frame\u001b[0m")
           }
     }
+
+def build(files: List[Path])(using opt: Config) =
+  files
+    |> trackTime("load", load)
+    |> trackTime("parse", parse)
+    |> trackTime("lower", lower)
+    |> trackTime("hoist", hoist)
+    |> trackTime("optimize", optimize)
+    |> trackTime("regalloc", regalloc)
+
+def loadFiles()(using opt: Config) =
+  val stl_root = Path.of(opt.aoc_home, "stl", "src")
+  var dirs = List(Path.of(".", "src"))
+
+  if opt.include_stl then dirs = stl_root :: dirs
+
+  if opt.mode == "test" then dirs = Path.of(".", "test") :: dirs
+
+  val files =
+    dirs
+      .flatMap(Files.walk(_).iterator().asScala)
+      .filter(_.toString.endsWith(".al"))
+
+  files
+
+def testCmd()(using opt: Config) =
+  val files = loadFiles()
+  val decls = build(files)
+  interpretTests(decls)
+
+case class Config(
+    mode: String = "repl",
+    aoc_home: String = System.getenv("AOCLANG_HOME"),
+    include_stl: Boolean = true,
+    print_times: Boolean = false
+)
+
+val builder = OParser.builder[Config]
+val argparse =
+  import builder.*
+  OParser.sequence(
+    programName("aoclang"),
+    cmd("test")
+      .action((_, c) => c.copy(mode = "test")),
+    opt[Unit]("no-stl")
+      .action((_, c) => c.copy(include_stl = false)),
+    opt[Unit]("times")
+      .action((_, c) => c.copy(print_times = true))
+  )
+
+@main
+def main(args: String*): Unit =
+  OParser.parse(argparse, args, Config()) match
+    case Some(opt) =>
+      opt.mode match
+        case "test" => testCmd()(using opt)
+        case "repl" => ???
+
+    case None =>
