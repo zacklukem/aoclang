@@ -1,0 +1,1 @@
+def read_string(path) = __intrinsic__("FileReadString", path)

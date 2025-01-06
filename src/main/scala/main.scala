@@ -111,6 +111,25 @@ def testCmd()(using opt: Config): Unit =
   val (decls, _) = build(files)
   interpretTests(decls)
 
+def runCmd()(using opt: Config): Unit =
+  val files = loadFiles()
+  val (decls, _) = build(files)
+  val interp = Interp(decls)
+  val Array(a, b) = opt.function.split('.')
+  val declName = a :@: b
+
+  decls(declName) match
+    case decl @ Low.Decl.Def(_, body) =>
+      try interp.eval(body)(using Array.ofDim(decl.maxStack.get), List(declName))
+      catch
+        case XceptWithStack(msg, stack) =>
+          println(s"\n\u001b[31m\tERROR: $msg\u001b[0m")
+          stack.foreach { frame =>
+            println(s"\u001b[31m\t\t$frame\u001b[0m")
+          }
+    case _ =>
+      println(s"Function $declName not found")
+
 def replCmd()(using opt: Config): Unit =
   val files = loadFiles()
   val (decls, modules) = build(files)
@@ -136,6 +155,7 @@ def replCmd()(using opt: Config): Unit =
 
 case class Config(
     mode: String = "repl",
+    function: String = "",
     aoc_home: String = System.getenv("AOCLANG_HOME"),
     include_stl: Boolean = true,
     print_times: Boolean = false
@@ -146,6 +166,13 @@ val argparse =
   import builder.*
   OParser.sequence(
     programName("aoclang"),
+    cmd("run")
+      .action((_, c) => c.copy(mode = "run"))
+      .children(
+        arg[String]("function")
+          .action((x, c) => c.copy(mode = "run", function = x))
+          .text("function to run")
+      ),
     cmd("test")
       .action((_, c) => c.copy(mode = "test")),
     opt[Unit]("no-stl")
@@ -160,6 +187,7 @@ def main(args: String*): Unit =
     case Some(opt) =>
       opt.mode match
         case "test" => testCmd()(using opt)
+        case "run"  => runCmd()(using opt)
         case "repl" => replCmd()(using opt)
 
     case None =>

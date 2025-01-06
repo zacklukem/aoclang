@@ -34,6 +34,7 @@ enum PrimOp:
   case TupleNew, TupleGet, TupleIs, TupleSize, TuplePut
   case StringChars, StringSize, StringFromChars, StringSplit, StringFromInt
   case IntIs, IntFromString
+  case FileReadString
   case ClosureNew
 
 extension (s: String)

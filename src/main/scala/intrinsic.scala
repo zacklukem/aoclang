@@ -1,5 +1,7 @@
 package aoclang
 
+import java.nio.file.{Files, Path}
+
 case class Xcept(msg: String) extends Exception(msg)
 case class XceptWithStack(msg: String, stack: List[Low.Name]) extends Exception(msg)
 
@@ -50,14 +52,14 @@ val INTRINSICS = Map[PrimOp, List[Value] => Value](
     case List(x) => Value.Lit(x.hashCode.toLong)
     case _       => xcept("Invalid types for (Stl.hash_code)")
   },
-//  "File.read_string" -> {
-//    case List(Value.Lit(path: String)) =>
-//      try
-//        val s = Files.readString(Path.of(path))
-//        Value.Lit(s)
-//      catch case e => xcept(s"Failed to read file")
-//    case _ => xcept("Invalid types for (File.read_string)")
-//  },
+  PrimOp.FileReadString -> {
+    case List(Value.Lit(path: String)) =>
+      try
+        val s = Files.readString(Path.of(path))
+        Value.Lit(s)
+      catch case e => xcept(s"Failed to read file")
+    case _ => xcept("Invalid types for (File.read_string)")
+  },
   PrimOp.StringChars -> {
     case List(Value.Lit(s: String)) => Value.ListVal(s.toList.map(_.toLong |> Value.Lit.apply))
     case _                          => xcept("Invalid types for (String.chars)")
