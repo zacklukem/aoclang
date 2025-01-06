@@ -81,13 +81,15 @@ def interpretTests(decls: Map[Symbol, Low.Decl])(using opt: Config): Unit =
     }
 
 def build(files: List[Path])(using opt: Config) =
-  files
+  val ast = files
     |> trackTime("load", load)
     |> trackTime("parse", parse)
-    |> trackTime("lower", lower)
+  val (decls, modules) = trackTime("lower", lower)(ast)
+  val code = decls
     |> trackTime("hoist", hoist)
     |> trackTime("optimize", optimize)
     |> trackTime("regalloc", regalloc)
+  (code, modules)
 
 def loadFiles()(using opt: Config) =
   val stl_root = Path.of(opt.aoc_home, "stl", "src")
@@ -104,10 +106,33 @@ def loadFiles()(using opt: Config) =
 
   files
 
-def testCmd()(using opt: Config) =
+def testCmd()(using opt: Config): Unit =
   val files = loadFiles()
-  val decls = build(files)
+  val (decls, _) = build(files)
   interpretTests(decls)
+
+def replCmd()(using opt: Config): Unit =
+  val files = loadFiles()
+  val (decls, modules) = build(files)
+  val interp = Interp(decls)
+  val initScope = Array.ofDim[Value](1000)
+
+  while true do
+    print("> ")
+    val line = scala.io.StdIn.readLine()
+    val src = Source(line)
+    val parser = Parser(src)
+    val expr = parser.parseSingleExpr
+    val tree = LowerExpr(modules("Stl"), modules).lower(expr) { v =>
+      High.Tree.AppC(Symbol.Ret, List(v))
+    }(using Map.empty)
+    val hoist = Hoist()
+    val hTree = hoist.hoist(tree)(using Map.empty)
+    val lowTree = regalloc(hTree)
+    interp.decls ++= hoist.newDecls.toList.map { case (sym, decl) => sym -> regalloc(decl) }
+    val res = interp.eval(lowTree)(using initScope, List(Symbol.Global(List("Repl", "repl"))))
+    println(intrinsicToString(res))
+    if line == null then return
 
 case class Config(
     mode: String = "repl",
@@ -135,6 +160,6 @@ def main(args: String*): Unit =
     case Some(opt) =>
       opt.mode match
         case "test" => testCmd()(using opt)
-        case "repl" => ???
+        case "repl" => replCmd()(using opt)
 
     case None =>

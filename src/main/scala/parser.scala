@@ -128,7 +128,7 @@ class Parser(source: Source):
           case None       => expr
         }
 
-  private def parseSingleExpr: Expr =
+  def parseSingleExpr: Expr =
     lx.peek match
       case Tok.Key("{") => parseBlockExpr
 

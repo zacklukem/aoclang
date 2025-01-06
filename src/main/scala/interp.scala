@@ -1,6 +1,7 @@
 package aoclang
 
 import scala.annotation.tailrec
+import scala.collection.mutable
 import Low.*
 
 enum Value:
@@ -20,7 +21,9 @@ enum Value:
       case (a: Ref, b: Ref)                         => a eq b
       case _                                        => false
 
-class Interp(val decls: Map[Symbol, Decl]):
+class Interp(inDecls: Map[Symbol, Decl]):
+  val decls: mutable.Map[Symbol, Decl] = mutable.Map.from(inDecls)
+
   private def evalNonTail(e: Tree)(using frame: Array[Value], stack: List[Name]): Value =
     eval(e)
 

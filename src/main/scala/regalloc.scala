@@ -8,15 +8,17 @@ def regalloc(decls: Map[Symbol, H.Decl]): Map[Symbol, L.Decl] =
     name -> regalloc(decl)
   }
 
-private def regalloc(decl: H.Decl): L.Decl =
-  val H.Decl.Def(params, body) = decl
+def regalloc(tree: H.Tree): L.Tree =
   var reg = 0
 
   def nextReg =
     reg += 1
     reg
 
-  def asdf(t: H.Tree)(using subst: Map[H.Name, L.Name]): L.Tree =
+  regalloc(tree, Map.empty, nextReg)
+
+private def regalloc(tree: H.Tree, subst: Map[H.Name, L.Name], nextReg: => Int): L.Tree =
+  def walk(t: H.Tree)(using subst: Map[H.Name, L.Name]): L.Tree =
     def sub4(name: H.Name): L.Name =
       name match
         case Symbol.Local(id)    => nextReg
@@ -37,17 +39,17 @@ private def regalloc(decl: H.Decl): L.Decl =
         L.Tree.LetC(
           newName,
           newArgs,
-          asdf(value)(using subst ++ args.zip(newArgs)),
-          asdf(body)(using subst + (name -> newName))
+          walk(value)(using subst ++ args.zip(newArgs)),
+          walk(body)(using subst + (name -> newName))
         )
 
       case H.Tree.LetL(name, value, body) =>
         val newName = sub4(name)
-        L.Tree.LetL(newName, value, asdf(body)(using subst + (name -> newName)))
+        L.Tree.LetL(newName, value, walk(body)(using subst + (name -> newName)))
 
       case H.Tree.LetP(name, prim, args, body) =>
         val newName = sub4(name)
-        L.Tree.LetP(newName, prim, args.map(sub), asdf(body)(using subst + (name -> newName)))
+        L.Tree.LetP(newName, prim, args.map(sub), walk(body)(using subst + (name -> newName)))
 
       case H.Tree.If(cond, thenC, elseC) =>
         L.Tree.If(sub(cond), sub(thenC), sub(elseC))
@@ -57,6 +59,17 @@ private def regalloc(decl: H.Decl): L.Decl =
 
       case H.Tree.LetF(name, args, value, body) => throw Error()
 
+  walk(tree)(using subst)
+
+private def regalloc(decl: H.Decl): L.Decl =
+  val H.Decl.Def(params, body) = decl
+
+  var reg = 0
+
+  def nextReg =
+    reg += 1
+    reg
+
   val newParams = params.map { name => nextReg }
-  val newBody = asdf(body)(using params.zip(newParams).toMap)
+  val newBody = regalloc(body, params.zip(newParams).toMap, nextReg)
   L.Decl.Def(newParams, newBody).withMaxStack(reg + 1)

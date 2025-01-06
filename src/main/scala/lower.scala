@@ -197,7 +197,9 @@ def emit(span: Span, e: String): Nothing =
   span.printLineColumn("error")
   throw new Exception(e)
 
-def lower(asts: List[(String, List[Decl])]): Map[Symbol, High.Decl] =
+def lower(
+    asts: List[(String, List[Decl])]
+): (Map[Symbol, High.Decl], Map[String, Map[String, Symbol]]) =
   val lower = Lower()
   asts.foreach({ case (mod, decls) => lower.declare(mod, decls) })
   asts
@@ -212,10 +214,10 @@ def lower(asts: List[(String, List[Decl])]): Map[Symbol, High.Decl] =
     .foreach({ (mod, decls) =>
       lower.lower(mod, decls.map({ case (_, importMod, decl) => (importMod, decl) }))
     })
-  lower.decls.toMap
+  (lower.decls.toMap, lower.modules.toMap)
 
 private class Lower:
-  private val modules: mutable.Map[String, Map[String, Symbol]] = mutable.Map()
+  val modules: mutable.Map[String, Map[String, Symbol]] = mutable.Map()
   val decls: mutable.Map[Symbol, High.Decl] = mutable.Map()
 
   def declare(mod: String, decl: List[Decl]): Unit =
@@ -424,7 +426,9 @@ class LowerExpr(
           c(name)
         )
 
-  private def lower_tail(e: Option[Expr])(c: Symbol)(using sym: Map[Tok.Id | Tok.Op, Symbol]): Tree =
+  private def lower_tail(
+      e: Option[Expr]
+  )(c: Symbol)(using sym: Map[Tok.Id | Tok.Op, Symbol]): Tree =
     e
       .map(lower_tail(_)(c))
       .getOrElse(letlNone(s => Tree.AppC(c, List(s))))
