@@ -124,7 +124,10 @@ class Optimizer(val decls: mutable.Map[Symbol, Decl]):
 
   private def census(t: Tree): Map[Symbol, Int] =
     def census(t: Tree)(using useCount: mutable.Map[Symbol, Int]): Unit =
-      def use(s: Symbol): Unit = useCount.update(s, useCount.getOrElse(s, 0) + 1)
+      def use(s: Symbol): Unit = useCount.updateWith(s) {
+        case None    => Some(1)
+        case Some(c) => Some(c + 1)
+      }
 
       t match
         case Tree.AppF(fn, retC, args) =>

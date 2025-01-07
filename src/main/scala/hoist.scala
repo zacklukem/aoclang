@@ -17,42 +17,61 @@ private class Hoist:
   val newDecls: mutable.ListBuffer[(Symbol, High.Decl)] = mutable.ListBuffer[(Symbol, Decl)]()
 
   private def inSymbols(t: Tree): Set[Symbol] =
-    t match
-      case Tree.AppF(fn, retC, args) =>
-        Set.from(retC :: fn :: args)
-      case Tree.AppC(fn, args) =>
-        Set.from(fn :: args)
-      case Tree.LetC(name, args, value, body) =>
-        inSymbols(body) ++ inSymbols(value)
-      case Tree.LetF(name, args, value, body) =>
-        inSymbols(body) ++ inSymbols(value)
-      case Tree.LetL(name, value, body) =>
-        inSymbols(body)
-      case Tree.LetP(name, prim, args, body) =>
-        inSymbols(body) ++ args
-      case Tree.If(cond, thenC, elseC) =>
-        Set(cond, thenC, elseC)
-      case Tree.Raise(value) =>
-        Set(value)
+    val symbols = mutable.Set[Symbol]()
+    def inSymbols(t: Tree): Unit =
+      t match
+        case Tree.AppF(fn, retC, args) =>
+          symbols += retC
+          symbols += fn
+          symbols ++= args
+        case Tree.AppC(fn, args) =>
+          symbols += fn
+          symbols ++= args
+        case Tree.LetC(name, args, value, body) =>
+          inSymbols(value)
+          inSymbols(body)
+        case Tree.LetF(name, args, value, body) =>
+          inSymbols(value)
+          inSymbols(body)
+        case Tree.LetL(name, value, body) =>
+          inSymbols(body)
+        case Tree.LetP(name, prim, args, body) =>
+          symbols ++= args
+          inSymbols(body)
+        case Tree.If(cond, thenC, elseC) =>
+          symbols += cond
+          symbols += thenC
+          symbols += elseC
+        case Tree.Raise(value) =>
+          symbols += value
+
+    inSymbols(t)
+    symbols.toSet
 
   private def outSymbols(t: Tree): Set[Symbol] =
-    t match
-      case Tree.AppF(fn, retC, args) =>
-        Set.empty
-      case Tree.AppC(fn, args) =>
-        Set.empty
-      case Tree.LetC(name, args, value, body) =>
-        outSymbols(value) ++ outSymbols(body) ++ args + name
-      case Tree.LetF(name, args, value, body) =>
-        outSymbols(value) ++ outSymbols(body) ++ args + name
-      case Tree.LetL(name, value, body) =>
-        outSymbols(body) + name
-      case Tree.LetP(name, prim, args, body) =>
-        outSymbols(body) + name
-      case Tree.If(cond, thenC, elseC) =>
-        Set.empty
-      case Tree.Raise(value) =>
-        Set.empty
+    val symbols = mutable.Set[Symbol]()
+    def outSymbols(t: Tree): Unit =
+      t match
+        case Tree.LetC(name, args, value, body) =>
+          symbols += name
+          symbols ++= args
+          outSymbols(value)
+          outSymbols(body)
+        case Tree.LetF(name, args, value, body) =>
+          symbols += name
+          symbols ++= args
+          outSymbols(value)
+          outSymbols(body)
+        case Tree.LetL(name, value, body) =>
+          symbols += name
+          outSymbols(body)
+        case Tree.LetP(name, prim, args, body) =>
+          symbols += name
+          outSymbols(body)
+        case _ => ()
+
+    outSymbols(t)
+    symbols.toSet
 
   def hoist(t: Tree)(using subst: Map[Symbol, Symbol]): Tree =
     def sub(s: Symbol): Symbol =
