@@ -264,20 +264,29 @@ private class Lower:
   ): High.Decl =
     val argsSym = (1 to arity).map { idx => Symbol.local(s"_arg${idx}_") }.toList
 
-    def fail = letp(PrimOp.TupleNew, argsSym) { args =>
-      letl("match error: ") { msg =>
-        letp(PrimOp.Concat, List(msg, args))(Tree.Raise(_))
-      }
-    }
-    val e = decls.foldRight(fail) { case ((importMod, Decl.Def(name, pat, body: Expr)), next) =>
-      val lower = LowerExpr(globals ++ modules(importMod), modules)
-      lower_pat_product(pat.zip(argsSym)) {
-        case Some(bindings) =>
-          lower.lower_tail(body)(Symbol.Ret)(using bindings)
-        case None =>
-          next
-      }
-    }
+    def lowerDecls(decls: List[(String, Decl)]): Tree =
+      decls match
+        case Nil =>
+          letp(PrimOp.TupleNew, argsSym) { args =>
+            letl("match function error: ") { msg =>
+              letp(PrimOp.Concat, List(msg, args))(Tree.Raise(_))
+            }
+          }
+        case (importMod, Decl.Def(name, pat, body)) :: rest =>
+          letc(
+            Nil,
+            lowerDecls(rest)
+          ) { elseC =>
+            val lower = LowerExpr(globals ++ modules(importMod), modules)
+            lower_pat_product(pat.zip(argsSym)) {
+              case Some(bindings) =>
+                lower.lower_tail(body)(Symbol.Ret)(using bindings)
+              case None =>
+                Tree.AppC(elseC, Nil)
+            }
+          }
+
+    val e = lowerDecls(decls)
 
     High.Decl.Def(argsSym, e)
 
@@ -302,6 +311,32 @@ class LowerExpr(
         lower(e) { value =>
           lower(rest)(values => c(value :: values))
         }
+
+  def lowerMatch(expr: Expr, cases: List[MatchCase])(c: Symbol)(using
+      sym: Map[Tok.Id | Tok.Op, Symbol]
+  ): High.Tree =
+    lower(expr) { expr =>
+      def lowerCases(cases: List[MatchCase]): Tree =
+        cases match
+          case Nil =>
+            letl("match expr error: ") { msg =>
+              letp(PrimOp.Concat, List(msg, expr))(Tree.Raise(_))
+            }
+          case MatchCase(pat, body) :: rest =>
+            letc(
+              Nil,
+              lowerCases(rest)
+            ) { elseC =>
+              lower_pat(pat, expr) {
+                case Some(bindings) =>
+                  lower_tail(body)(c)(using sym ++ bindings)
+                case None =>
+                  Tree.AppC(elseC, Nil)
+              }
+            }
+
+      lowerCases(cases)
+    }
 
   def lower(e: Expr)(c: Symbol => Tree)(using sym: Map[Tok.Id | Tok.Op, Symbol]): Tree =
     e match
@@ -392,21 +427,9 @@ class LowerExpr(
 
       case Expr.Match(expr, _, cases, _) =>
         val res = Symbol.local
-        letc(List(res), c(res)) { c =>
-          lower(expr) { expr =>
-            def fail = letl("match expr error: ") { msg =>
-              letp(PrimOp.Concat, List(msg, expr))(Tree.Raise(_))
-            }
 
-            cases.foldRight(fail) { case (MatchCase(pat, body), next) =>
-              lower_pat(pat, expr) {
-                case Some(bindings) =>
-                  lower_tail(body)(c)(using sym ++ bindings)
-                case None =>
-                  next
-              }
-            }
-          }
+        letc(List(res), c(res)) { c =>
+          lowerMatch(expr, cases)(c)
         }
 
       case Expr.Lambda(_, args, _, body) =>
@@ -509,20 +532,7 @@ class LowerExpr(
         }
 
       case Expr.Match(expr, _, cases, _) =>
-        lower(expr) { expr =>
-          def fail = letl("match expr error: ") { msg =>
-            letp(PrimOp.Concat, List(msg, expr))(Tree.Raise(_))
-          }
-
-          cases.foldRight(fail) { case (MatchCase(pat, body), next) =>
-            lower_pat(pat, expr) {
-              case Some(bindings) =>
-                lower_tail(body)(c)(using sym ++ bindings)
-              case None =>
-                next
-            }
-          }
-        }
+        lowerMatch(expr, cases)(c)
 
       case Expr.Lambda(_, args, _, body) =>
         val name = Symbol.local
