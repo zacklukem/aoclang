@@ -37,7 +37,7 @@ def _get(node, idx, depth) = {
   let tidx = idx & 31
 
   match Tuple.get(node, tidx) {
-    'none => 0 == 1,
+    'none => false,
     child => _get(child, idx >> 5, depth - 1),
   }
 }

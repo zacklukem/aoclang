@@ -21,8 +21,8 @@ def _mk(ts) = ('prio_queue, ts)
 
 def new() = ('prio_queue, [])
 def is_empty(('prio_queue, ts)) = ts == []
-def is(('prio_queue, ts)) = 1 == 1
-def is(_) = 1 == 0
+def is(('prio_queue, ts)) = true
+def is(_) = false
 
 def enqueue(('prio_queue, ts), prio, val) = {
   let x = (prio, val)

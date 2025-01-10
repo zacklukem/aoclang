@@ -51,9 +51,8 @@ def _foreach(enum, f) = match Enumerable.next(enum) {
 
 def contains(enum, v) = _contains(Enumerable.from(enum), v)
 def _contains(enum, v) = match Enumerable.next(enum) {
-    # TODO: boolean literals
-    (_, 'none) => 0 == 1,
-    (enum, ('some, v')) => if v == v' { 0 == 0 } else { _contains(enum, v) }
+    (_, 'none) => false,
+    (enum, ('some, v')) => if v == v' { true } else { _contains(enum, v) }
   }
 
 def to_list(enum) = rev(rev(enum))

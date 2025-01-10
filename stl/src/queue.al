@@ -1,5 +1,5 @@
-def is(('queue, in, out)) = 1 == 1
-def is(_) = 1 == 0
+def is(('queue, in, out)) = true
+def is(_) = false
 
 def new(vs) = {
   ('queue, vs, [])
