@@ -62,6 +62,15 @@ val KEYWORDS =
 val OPERATOR_CHARS =
   Set('+', '-', '*', '/', '=', '!', '<', '>', '&', '|', '^', '~', '%', '?', ':', '.', ',', '@')
 
+def convertEscapeChar(c: Char) =
+  c match
+    case 'n' => '\n'
+    case 'r' => '\r'
+    case 't' => '\t'
+    case 'b' => '\b'
+    case 'f' => '\f'
+    case c   => c
+
 def cleanEscape(s: String) =
   val sb = new StringBuilder
   var i = 0
@@ -70,13 +79,7 @@ def cleanEscape(s: String) =
     if c == '\\' then
       i += 1
       val c2 = s.charAt(i)
-      c2 match
-        case 'n' => sb.append('\n')
-        case 'r' => sb.append('\r')
-        case 't' => sb.append('\t')
-        case 'b' => sb.append('\b')
-        case 'f' => sb.append('\f')
-        case c2  => sb.append(c2)
+      sb.append(convertEscapeChar(c2))
     else sb.append(c)
     i += 1
   sb.toString
@@ -100,6 +103,15 @@ private class LexerInner(source: Source):
 
       case Some('(' | ')' | '{' | '}' | '[' | ']' | ',' | '.') =>
         Tok.Key(sc.lexeme) withSpan sc.close
+
+      case Some('`') if sc.peek.contains('\\') =>
+        sc.next
+        val v = convertEscapeChar(sc.next.get)
+        Tok.Lit(v.toLong) withSpan sc.close
+
+      case Some('`') =>
+        val v = sc.next.get
+        Tok.Lit(v.toLong) withSpan sc.close
 
       case Some('\'') if sc.peek.exists(_.isIdentStart) =>
         sc.next
