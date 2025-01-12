@@ -4,6 +4,8 @@ import scopt.OParser
 
 import scala.jdk.CollectionConverters.*
 import java.nio.file.{Files, Path}
+import java.io.{File, PrintWriter}
+import sys.process.*
 
 def printTree(obj: Any, depth: Int = 0, paramName: Option[String] = None): Unit =
   val indent = "| " * depth
@@ -112,9 +114,15 @@ def compileCmd()(using opt: Config): Unit =
   val files = loadFiles()
   val (decls, _) = build(files)
   Files.deleteIfExists(Path.of("out.c"))
-  val f = Files.createFile(Path.of("out.c")).toFile
-  val w = new java.io.PrintWriter(f)
+  val cfile = Files.createFile(Path.of("out.c")).toFile
+  val w = PrintWriter(cfile)
   Gen(w).genAll(decls)
+  println("Building runtime...")
+  Process("cargo build --release", File(opt.aoc_home, "rt")).!
+  println("Building c file...")
+  s"cc -O3 ${cfile.getAbsolutePath} ${opt.aoc_home}/rt/target/release/librt.a -I${opt.aoc_home}/rt/include -o a.out".!
+  println("Running executable...")
+  s"./a.out".!
 
 def testCmd()(using opt: Config): Unit =
   val files = loadFiles()

@@ -206,6 +206,7 @@ class Gen(f: PrintWriter):
 
       case Tree.Raise(value) =>
         writeInst(s"_al_raise(${genNameClosed(value)});")
+        writeInst(s"return _al_sym_new(rt, \"unreachable\");")
         continue()
 
       case Tree.LetF(name, args, value, body) => !!!

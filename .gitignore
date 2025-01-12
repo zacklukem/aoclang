@@ -49,3 +49,4 @@ build/
 .metals/
 rt/include/
 *.c
+a.out
