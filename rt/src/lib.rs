@@ -20,8 +20,9 @@ use value::{
     SOME_SYMBOL_PTR_TARGET,
 };
 
-pub struct Runtime {
+pub struct Runtime<'a> {
     symbol_table: HashMap<String, &'static &'static str>,
+    frames: Vec<&'a [Value]>
 }
 
 fn throw(_runtime: &Runtime, msg: &str) -> ! {
@@ -682,12 +683,12 @@ pub unsafe extern "C" fn _al_raise(val: Value) -> bool {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn _al_runtime_new() -> *mut Runtime {
+pub unsafe extern "C" fn _al_runtime_new<'a>() -> *mut Runtime<'a> {
     let mut symbol_table = HashMap::new();
     symbol_table.insert("none".to_string(), &NONE_SYMBOL_PTR_TARGET);
     symbol_table.insert("some".to_string(), &SOME_SYMBOL_PTR_TARGET);
 
-    Box::into_raw(Box::new(Runtime { symbol_table }))
+    Box::into_raw(Box::new(Runtime { symbol_table, frames: Vec::new() }))
 }
 
 #[no_mangle]
@@ -714,7 +715,9 @@ pub unsafe extern "C" fn _al_test_harness(rt: &mut Runtime, f: FnPtr, name: *con
 #[no_mangle]
 pub unsafe extern "C" fn _al_enter_frame(
     _runtime: &mut Runtime,
-    _nloc: usize,
-    _frame: *const Value,
+    nloc: usize,
+    frame: *mut Value,
 ) {
+    let frame = slice::from_raw_parts_mut(frame, nloc);
+    frame.fill(NONE);
 }
