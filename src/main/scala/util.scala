@@ -2,6 +2,8 @@ package aoclang
 
 import scala.annotation.targetName
 
+def !!! = throw Error()
+
 case class Sym(name: String):
   override def toString: String = s"'$name"
 

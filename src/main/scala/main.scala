@@ -80,7 +80,9 @@ def interpretTests(decls: Map[Symbol, Low.Decl])(using opt: Config): Unit =
           }
     }
 
-def build(files: List[Path])(using opt: Config) =
+def build(files: List[Path])(using
+    opt: Config
+): (Map[Symbol, Low.Decl], Map[String, Map[String, Symbol]]) =
   val ast = files
     |> trackTime("load", load)
     |> trackTime("parse", parse)
@@ -97,7 +99,7 @@ def loadFiles()(using opt: Config) =
 
   if opt.include_stl then dirs = stl_root :: dirs
 
-  if opt.mode == "test" then dirs = Path.of(".", "test") :: dirs
+  if opt.mode == "test" || opt.mode == "compile" then dirs = Path.of(".", "test") :: dirs
 
   val files =
     dirs
@@ -105,6 +107,14 @@ def loadFiles()(using opt: Config) =
       .filter(_.toString.endsWith(".al"))
 
   files
+
+def compileCmd()(using opt: Config): Unit =
+  val files = loadFiles()
+  val (decls, _) = build(files)
+  Files.deleteIfExists(Path.of("out.c"))
+  val f = Files.createFile(Path.of("out.c")).toFile
+  val w = new java.io.PrintWriter(f)
+  Gen(w).genAll(decls)
 
 def testCmd()(using opt: Config): Unit =
   val files = loadFiles()
@@ -175,6 +185,8 @@ val argparse =
       ),
     cmd("test")
       .action((_, c) => c.copy(mode = "test")),
+    cmd("compile")
+      .action((_, c) => c.copy(mode = "compile")),
     opt[Unit]("no-stl")
       .action((_, c) => c.copy(include_stl = false)),
     opt[Unit]("times")
@@ -186,8 +198,9 @@ def main(args: String*): Unit =
   OParser.parse(argparse, args, Config()) match
     case Some(opt) =>
       opt.mode match
-        case "test" => testCmd()(using opt)
-        case "run"  => runCmd()(using opt)
-        case "repl" => replCmd()(using opt)
+        case "test"    => testCmd()(using opt)
+        case "run"     => runCmd()(using opt)
+        case "repl"    => replCmd()(using opt)
+        case "compile" => compileCmd()(using opt)
 
     case None =>

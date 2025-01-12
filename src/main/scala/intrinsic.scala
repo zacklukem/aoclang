@@ -208,9 +208,9 @@ val INTRINSICS = Map[PrimOp, List[Value] => Value](
   },
   PrimOp.Pow -> {
     case List(Value.Lit(x: Long), Value.Lit(y: Long))     => Value.Lit(Math.pow(x, y).toLong)
-    case List(Value.Lit(x: Double), Value.Lit(y: Double)) => Value.Lit(Math.pow(x, y).toLong)
-    case List(Value.Lit(x: Long), Value.Lit(y: Double))   => Value.Lit(Math.pow(x, y).toLong)
-    case List(Value.Lit(x: Double), Value.Lit(y: Long))   => Value.Lit(Math.pow(x, y).toLong)
+    case List(Value.Lit(x: Double), Value.Lit(y: Double)) => Value.Lit(Math.pow(x, y))
+    case List(Value.Lit(x: Long), Value.Lit(y: Double))   => Value.Lit(Math.pow(x, y))
+    case List(Value.Lit(x: Double), Value.Lit(y: Long))   => Value.Lit(Math.pow(x, y))
     case _                                                => xcept("Invalid types for (**)")
   },
   PrimOp.BAnd -> {
