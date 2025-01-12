@@ -69,8 +69,8 @@ pub struct Closure {
 
 pub type List = Option<Gc<ListCons>>;
 
-pub fn cons(head: Value, tail: List) -> List {
-    Some(Gc::new(ListCons(head, tail)))
+pub fn cons(runtime: &mut Runtime, head: Value, tail: List) -> List {
+    Some(Gc::new(runtime, ListCons(head, tail)))
 }
 
 #[derive(Clone, Copy, PartialEq, Hash)]

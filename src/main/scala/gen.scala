@@ -52,23 +52,33 @@ class Gen(f: PrintWriter):
 
     decls.foreach { case (name, Decl.Def(args, tree)) =>
       write(
-        s"value_t ${genName(name)}(runtime_t *rt${args.map(genName).map(v => s", value_t ${v}").mkString});"
+        s"value_t ${genName(name)}(runtime_t *rt${args.map(v => s", value_t _arg_$v").mkString});"
       )
       write(s"value_t _al_closure_${genName(name)} = {._0 = 0, ._1 = (uint64_t)${genName(name)}};")
     }
     decls.foreach { case (name, Decl.Def(args, tree)) =>
       write(
-        s"value_t ${genName(name)}(runtime_t *rt${args.map(genName).map(v => s", value_t ${v}").mkString}) {"
+        s"value_t ${genName(name)}(runtime_t *rt${args.map(v => s", value_t _arg_$v").mkString}) {"
       )
-      genLocals(tree)
+      writeInst(s"struct {")
+      args.foreach { arg =>
+        writeInst(s"\tvalue_t _$arg;")
+      }
       // TODO: find max temp size
-      writeInst("value_t _tmp_arr[50];")
+      val ntmp = 50;
+      val nloc = genLocals(tree) + args.length + ntmp;
+      writeInst(s"\tvalue_t _tmp_arr[$ntmp];")
+      writeInst("} locals;")
+      writeInst(s"_al_enter_frame(rt, $nloc, (void*)&locals);")
+      args.foreach { arg =>
+        writeInst(s"${genName(arg)} = _arg_$arg;")
+      }
       genBody(tree)(using Nil, Map.empty)
       write("}")
     }
 
     write(s"int main(int argc, char **argv) {")
-    writeInst("const runtime_t *rt = _al_runtime_new();")
+    writeInst("runtime_t *rt = _al_runtime_new();")
     decls.toSeq
       .filter((name, _) => isTest(name))
       .sortBy(_._1.toString)
@@ -80,7 +90,7 @@ class Gen(f: PrintWriter):
   def genName(n: Name): String =
     n match
       case Symbol.Global(g) => s"__${g.map(cleanGlobal).mkString("_")}"
-      case v: Int           => s"_$v"
+      case v: Int           => s"locals._$v"
       case _                => "!$!ERROR!$!"
 
   def genNameClosed(n: Name): String =
@@ -88,22 +98,27 @@ class Gen(f: PrintWriter):
       case n: Symbol.Global => s"_al_closure_${genName(n)}"
       case n                => genName(n)
 
-  def genLocals(t: Tree): Unit =
+  def genLocals(t: Tree): Int =
+    var i = 0;
     def use(n: Name) =
-      writeInst(s"value_t ${genName(n)};")
+      i += 1;
+      writeInst(s"\tvalue_t _$n;")
 
-    t match
-      case Tree.LetC(_name, args, value, body) =>
-        args.foreach(use)
-        genLocals(value)
-        genLocals(body)
-      case Tree.LetL(name, _value, body) =>
-        use(name)
-        genLocals(body)
-      case Tree.LetP(name, _prim, _args, body) =>
-        use(name)
-        genLocals(body)
-      case _ => ()
+    def genLocals(t: Tree): Unit =
+      t match
+        case Tree.LetC(_name, args, value, body) =>
+          args.foreach(use)
+          genLocals(value)
+          genLocals(body)
+        case Tree.LetL(name, _value, body) =>
+          use(name)
+          genLocals(body)
+        case Tree.LetP(name, _prim, _args, body) =>
+          use(name)
+          genLocals(body)
+        case _ => ()
+    genLocals(t)
+    i
 
   // String | Long | Double | Boolean | Sym
   def genValue(v: LitValue): String =
@@ -116,13 +131,13 @@ class Gen(f: PrintWriter):
 
   def genTempArray(vs: Seq[Name]) =
     vs.zipWithIndex.foreach { case (v, i) =>
-      writeInst(s"_tmp_arr[$i] = ${genNameClosed(v)};")
+      writeInst(s"locals._tmp_arr[$i] = ${genNameClosed(v)};")
     }
 
   def genBody(t: Tree)(using queue: List[(Name, Tree)], cEnv: Map[Name, List[Name]]): Unit =
     def continue() =
       queue.foreach { case (cName, cTree) =>
-        write(s"${genName(cName)}:")
+        write(s"_$cName:")
         genBody(cTree)(using Nil)
       }
 
@@ -141,14 +156,14 @@ class Gen(f: PrintWriter):
       case Tree.LetP(name, PrimOp.ClosureNew, fn :: args, body) =>
         genTempArray(args)
         writeInst(
-          s"${genName(name)} = _al_closure_new(rt, (void*)${genName(fn)}, ${args.length}, _tmp_arr);"
+          s"${genName(name)} = _al_closure_new(rt, (void*)${genName(fn)}, ${args.length}, locals._tmp_arr);"
         )
         genBody(body)
 
       case p @ Tree.LetP(name, PrimOp.ListNew | PrimOp.TupleNew, args, body) =>
         genTempArray(args)
         writeInst(
-          s"${genName(name)} = _al${cleanBuiltin(p.prim.toString)}(rt, ${args.length}, _tmp_arr);"
+          s"${genName(name)} = _al${cleanBuiltin(p.prim.toString)}(rt, ${args.length}, locals._tmp_arr);"
         )
         genBody(body)
 
@@ -169,13 +184,13 @@ class Gen(f: PrintWriter):
         writeInst(
           s"${genName(retN)} = ${genName(name)}(rt${args.map(v => s", ${genNameClosed(v)}").mkString});"
         )
-        writeInst(s"goto ${genName(retC)};")
+        writeInst(s"goto _$retC;")
         continue()
 
       case Tree.AppF(fn, Symbol.Ret, args) =>
         genTempArray(args)
         writeInst(
-          s"return _al_call(rt, ${genName(fn)}, ${args.length}, _tmp_arr);"
+          s"return _al_call(rt, ${genName(fn)}, ${args.length}, locals._tmp_arr);"
         )
         continue()
 
@@ -183,9 +198,9 @@ class Gen(f: PrintWriter):
         val List(retN) = cEnv(retC)
         genTempArray(args)
         writeInst(
-          s"${genName(retN)} = _al_call(rt, ${genName(fn)}, ${args.length}, _tmp_arr);"
+          s"${genName(retN)} = _al_call(rt, ${genName(fn)}, ${args.length}, locals._tmp_arr);"
         )
-        writeInst(s"goto ${genName(retC)};")
+        writeInst(s"goto _$retC;")
         continue()
 
       case Tree.AppC(Symbol.Ret, List(arg)) =>
@@ -196,12 +211,12 @@ class Gen(f: PrintWriter):
         cEnv(fn).zip(args).foreach { case (dest, src) =>
           writeInst(s"${genName(dest)} = ${genNameClosed(src)};")
         }
-        writeInst(s"goto ${genName(fn)};")
+        writeInst(s"goto _$fn;")
         continue()
 
       case Tree.If(cond, thenC, elseC) =>
-        writeInst(s"if (_al_get_bool(rt, ${genNameClosed(cond)})) goto ${genName(thenC)};")
-        writeInst(s"else goto ${genName(elseC)};")
+        writeInst(s"if (_al_get_bool(rt, ${genNameClosed(cond)})) goto _$thenC;")
+        writeInst(s"else goto _$elseC;")
         continue()
 
       case Tree.Raise(value) =>

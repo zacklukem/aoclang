@@ -3,6 +3,7 @@ use std::{
     ops::{Deref, DerefMut},
     ptr::NonNull,
 };
+use crate::Runtime;
 
 #[repr(transparent)]
 pub struct Gc<T> {
@@ -44,7 +45,7 @@ impl<T> Clone for Gc<T> {
 impl<T> Copy for Gc<T> {}
 
 impl<T> Gc<T> {
-    pub fn new(data: T) -> Self {
+    pub fn new(_runtime: &mut Runtime, data: T) -> Self {
         Gc {
             ptr: unsafe { NonNull::new_unchecked(Box::into_raw(Box::new(data))) },
         }

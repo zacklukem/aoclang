@@ -5,6 +5,7 @@
 mod gc;
 mod value;
 
+use gc::Gc;
 use std::{
     char,
     collections::HashMap,
@@ -13,17 +14,14 @@ use std::{
     hash::{DefaultHasher, Hash, Hasher},
     ops::{Add, BitAnd, BitOr, BitXor, Deref, Mul, Rem, Sub},
     panic, slice,
-    sync::Mutex,
 };
-
-use gc::Gc;
 use value::{
     cons, Closure, FnPtr, HFloat, Ref, Symbol, Value, NONE, NONE_SYMBOL_PTR_TARGET, SOME,
     SOME_SYMBOL_PTR_TARGET,
 };
 
 pub struct Runtime {
-    symbol_table: Mutex<HashMap<String, &'static &'static str>>,
+    symbol_table: HashMap<String, &'static &'static str>,
 }
 
 fn throw(_runtime: &Runtime, msg: &str) -> ! {
@@ -39,7 +37,7 @@ macro_rules! throw {
 
 // case PrintLine, Assert, AssertEq, HashCode
 #[no_mangle]
-pub unsafe extern "C" fn _al_print_line(_runtime: &Runtime, line: Value) -> Value {
+pub unsafe extern "C" fn _al_print_line(_runtime: &mut Runtime, line: Value) -> Value {
     match line {
         Value::Str(line) => {
             println!("{}", *line);
@@ -53,7 +51,7 @@ pub unsafe extern "C" fn _al_print_line(_runtime: &Runtime, line: Value) -> Valu
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn _al_assert(runtime: &Runtime, val: Value) -> Value {
+pub unsafe extern "C" fn _al_assert(runtime: &mut Runtime, val: Value) -> Value {
     if let Value::Boolean(false) = val {
         throw(runtime, "Assertion failed");
     } else {
@@ -62,7 +60,7 @@ pub unsafe extern "C" fn _al_assert(runtime: &Runtime, val: Value) -> Value {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn _al_assert_eq(runtime: &Runtime, lhs: Value, rhs: Value) -> Value {
+pub unsafe extern "C" fn _al_assert_eq(runtime: &mut Runtime, lhs: Value, rhs: Value) -> Value {
     if lhs != rhs {
         throw!(runtime, "Assertion failed: {lhs} != {rhs}");
     } else {
@@ -71,7 +69,7 @@ pub unsafe extern "C" fn _al_assert_eq(runtime: &Runtime, lhs: Value, rhs: Value
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn _al_hash_code(_runtime: &Runtime, val: Value) -> Value {
+pub unsafe extern "C" fn _al_hash_code(_runtime: &mut Runtime, val: Value) -> Value {
     let mut h = DefaultHasher::new();
     val.hash(&mut h);
     let res = (h.finish() & 0xffff_ffff) as i64;
@@ -80,12 +78,12 @@ pub unsafe extern "C" fn _al_hash_code(_runtime: &Runtime, val: Value) -> Value 
 
 // case Ref, Store, Load
 #[no_mangle]
-pub unsafe extern "C" fn _al_ref(_runtime: &Runtime, val: Value) -> Value {
-    Value::Ref(Ref(Gc::new(val)))
+pub unsafe extern "C" fn _al_ref(runtime: &mut Runtime, val: Value) -> Value {
+    Value::Ref(Ref(Gc::new(runtime, val)))
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn _al_store(runtime: &Runtime, target: Value, val: Value) -> Value {
+pub unsafe extern "C" fn _al_store(runtime: &mut Runtime, target: Value, val: Value) -> Value {
     if let Value::Ref(Ref(mut target)) = target {
         *target = val;
     } else {
@@ -96,7 +94,7 @@ pub unsafe extern "C" fn _al_store(runtime: &Runtime, target: Value, val: Value)
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn _al_load(runtime: &Runtime, source: Value) -> Value {
+pub unsafe extern "C" fn _al_load(runtime: &mut Runtime, source: Value) -> Value {
     if let Value::Ref(Ref(source)) = source {
         *source
     } else {
@@ -108,12 +106,12 @@ pub unsafe extern "C" fn _al_load(runtime: &Runtime, source: Value) -> Value {
 //   Concat, Not
 
 #[no_mangle]
-pub unsafe extern "C" fn _al_eq(_runtime: &Runtime, a: Value, b: Value) -> Value {
+pub unsafe extern "C" fn _al_eq(_runtime: &mut Runtime, a: Value, b: Value) -> Value {
     Value::Boolean(a == b)
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn _al_neq(_runtime: &Runtime, a: Value, b: Value) -> Value {
+pub unsafe extern "C" fn _al_neq(_runtime: &mut Runtime, a: Value, b: Value) -> Value {
     Value::Boolean(a != b)
 }
 
@@ -131,22 +129,22 @@ macro_rules! comparison_op {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn _al_lt(runtime: &Runtime, a: Value, b: Value) -> Value {
+pub unsafe extern "C" fn _al_lt(runtime: &mut Runtime, a: Value, b: Value) -> Value {
     comparison_op!(runtime, a, b, <)
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn _al_gt(runtime: &Runtime, a: Value, b: Value) -> Value {
+pub unsafe extern "C" fn _al_gt(runtime: &mut Runtime, a: Value, b: Value) -> Value {
     comparison_op!(runtime, a, b, >)
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn _al_le(runtime: &Runtime, a: Value, b: Value) -> Value {
+pub unsafe extern "C" fn _al_le(runtime: &mut Runtime, a: Value, b: Value) -> Value {
     comparison_op!(runtime, a, b, <=)
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn _al_ge(runtime: &Runtime, a: Value, b: Value) -> Value {
+pub unsafe extern "C" fn _al_ge(runtime: &mut Runtime, a: Value, b: Value) -> Value {
     comparison_op!(runtime, a, b, >=)
 }
 
@@ -163,22 +161,22 @@ macro_rules! math_op {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn _al_add(runtime: &Runtime, a: Value, b: Value) -> Value {
+pub unsafe extern "C" fn _al_add(runtime: &mut Runtime, a: Value, b: Value) -> Value {
     math_op!(runtime, a, b, wrapping_add, add)
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn _al_sub(runtime: &Runtime, a: Value, b: Value) -> Value {
+pub unsafe extern "C" fn _al_sub(runtime: &mut Runtime, a: Value, b: Value) -> Value {
     math_op!(runtime, a, b, wrapping_sub, sub)
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn _al_mul(runtime: &Runtime, a: Value, b: Value) -> Value {
+pub unsafe extern "C" fn _al_mul(runtime: &mut Runtime, a: Value, b: Value) -> Value {
     math_op!(runtime, a, b, wrapping_mul, mul)
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn _al_div_int(runtime: &Runtime, a: Value, b: Value) -> Value {
+pub unsafe extern "C" fn _al_div_int(runtime: &mut Runtime, a: Value, b: Value) -> Value {
     match (a, b) {
         (Value::Int(x), Value::Int(y)) => Value::Int(x / y),
         _ => throw(runtime, "Invalid types"),
@@ -186,7 +184,7 @@ pub unsafe extern "C" fn _al_div_int(runtime: &Runtime, a: Value, b: Value) -> V
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn _al_div_float(runtime: &Runtime, a: Value, b: Value) -> Value {
+pub unsafe extern "C" fn _al_div_float(runtime: &mut Runtime, a: Value, b: Value) -> Value {
     match (a, b) {
         (Value::Int(x), Value::Int(y)) => Value::Float(HFloat((x as f64) / (y as f64))),
         (Value::Float(HFloat(x)), Value::Float(HFloat(y))) => Value::Float(HFloat(x / y)),
@@ -197,12 +195,12 @@ pub unsafe extern "C" fn _al_div_float(runtime: &Runtime, a: Value, b: Value) ->
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn _al_mod(runtime: &Runtime, a: Value, b: Value) -> Value {
+pub unsafe extern "C" fn _al_mod(runtime: &mut Runtime, a: Value, b: Value) -> Value {
     math_op!(runtime, a, b, wrapping_rem, rem)
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn _al_pow(runtime: &Runtime, a: Value, b: Value) -> Value {
+pub unsafe extern "C" fn _al_pow(runtime: &mut Runtime, a: Value, b: Value) -> Value {
     match (a, b) {
         (Value::Int(x), Value::Int(y)) => Value::Float(HFloat((x as f64).powi(y as i32))),
         (Value::Float(HFloat(x)), Value::Float(HFloat(y))) => Value::Float(HFloat(x.powf(y))),
@@ -222,22 +220,22 @@ macro_rules! bit_op {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn _al_b_and(runtime: &Runtime, a: Value, b: Value) -> Value {
+pub unsafe extern "C" fn _al_b_and(runtime: &mut Runtime, a: Value, b: Value) -> Value {
     bit_op!(runtime, a, b, bitand)
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn _al_b_or(runtime: &Runtime, a: Value, b: Value) -> Value {
+pub unsafe extern "C" fn _al_b_or(runtime: &mut Runtime, a: Value, b: Value) -> Value {
     bit_op!(runtime, a, b, bitor)
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn _al_xor(runtime: &Runtime, a: Value, b: Value) -> Value {
+pub unsafe extern "C" fn _al_xor(runtime: &mut Runtime, a: Value, b: Value) -> Value {
     bit_op!(runtime, a, b, bitxor)
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn _al_shl(runtime: &Runtime, a: Value, b: Value) -> Value {
+pub unsafe extern "C" fn _al_shl(runtime: &mut Runtime, a: Value, b: Value) -> Value {
     match (a, b) {
         (Value::Int(x), Value::Int(y)) => Value::Int(x.wrapping_shl(y as u32)),
         _ => throw(runtime, "Invalid types"),
@@ -245,7 +243,7 @@ pub unsafe extern "C" fn _al_shl(runtime: &Runtime, a: Value, b: Value) -> Value
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn _al_shr(runtime: &Runtime, a: Value, b: Value) -> Value {
+pub unsafe extern "C" fn _al_shr(runtime: &mut Runtime, a: Value, b: Value) -> Value {
     match (a, b) {
         (Value::Int(x), Value::Int(y)) => Value::Int(x.wrapping_shr(y as u32)),
         _ => throw(runtime, "Invalid types"),
@@ -253,17 +251,17 @@ pub unsafe extern "C" fn _al_shr(runtime: &Runtime, a: Value, b: Value) -> Value
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn _al_concat(_runtime: &Runtime, a: Value, b: Value) -> Value {
+pub unsafe extern "C" fn _al_concat(runtime: &mut Runtime, a: Value, b: Value) -> Value {
     match (a, b) {
-        (Value::Str(a), Value::Str(b)) => Value::Str(Gc::new(a.as_ref().clone().add(b.as_ref()))),
-        (Value::Str(a), v) => Value::Str(Gc::new(format!("{}{}", a.as_ref(), v))),
-        (v, Value::Str(a)) => Value::Str(Gc::new(format!("{}{}", v, a.as_ref()))),
-        (a, b) => Value::Str(Gc::new(format!("{a}{b}"))),
+        (Value::Str(a), Value::Str(b)) => Value::Str(Gc::new(runtime, a.as_ref().clone().add(b.as_ref()))),
+        (Value::Str(a), v) => Value::Str(Gc::new(runtime, format!("{}{}", a.as_ref(), v))),
+        (v, Value::Str(a)) => Value::Str(Gc::new(runtime, format!("{}{}", v, a.as_ref()))),
+        (a, b) => Value::Str(Gc::new(runtime, format!("{a}{b}"))),
     }
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn _al_not(_runtime: &Runtime, a: Value) -> Value {
+pub unsafe extern "C" fn _al_not(_runtime: &mut Runtime, a: Value) -> Value {
     match a {
         Value::Boolean(b) => Value::Boolean(!b),
         _ => throw(_runtime, "Expected boolean"),
@@ -273,7 +271,7 @@ pub unsafe extern "C" fn _al_not(_runtime: &Runtime, a: Value) -> Value {
 // case ListNew, ListHead, ListTail, ListIs, ListIsEmpty, ListToTuple, ListCons
 #[no_mangle]
 pub unsafe extern "C" fn _al_list_new(
-    _runtime: &Runtime,
+    runtime: &mut Runtime,
     nargs: usize,
     args: *const Value,
 ) -> Value {
@@ -282,23 +280,23 @@ pub unsafe extern "C" fn _al_list_new(
     let args = unsafe { slice::from_raw_parts(args, nargs) };
 
     for arg in args.iter().rev().copied() {
-        res = cons(arg, res);
+        res = cons(runtime, arg, res);
     }
 
     Value::List(res)
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn _al_list_head(runtime: &Runtime, list: Value) -> Value {
+pub unsafe extern "C" fn _al_list_head(runtime: &mut Runtime, list: Value) -> Value {
     match list {
-        Value::List(Some(list)) => Value::Tuple(Gc::new(vec![SOME, list.0])),
+        Value::List(Some(list)) => Value::Tuple(Gc::new(runtime, vec![SOME, list.0])),
         Value::List(None) => NONE,
         _ => throw(runtime, "Expected list"),
     }
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn _al_list_tail(runtime: &Runtime, list: Value) -> Value {
+pub unsafe extern "C" fn _al_list_tail(runtime: &mut Runtime, list: Value) -> Value {
     match list {
         Value::List(Some(list)) => Value::List(list.1),
         Value::List(None) => NONE,
@@ -307,7 +305,7 @@ pub unsafe extern "C" fn _al_list_tail(runtime: &Runtime, list: Value) -> Value 
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn _al_list_is(_runtime: &Runtime, list: Value) -> Value {
+pub unsafe extern "C" fn _al_list_is(_runtime: &mut Runtime, list: Value) -> Value {
     match list {
         Value::List(_) => Value::Boolean(true),
         _ => Value::Boolean(false),
@@ -315,12 +313,12 @@ pub unsafe extern "C" fn _al_list_is(_runtime: &Runtime, list: Value) -> Value {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn _al_list_is_empty(_runtime: &Runtime, list: Value) -> Value {
+pub unsafe extern "C" fn _al_list_is_empty(_runtime: &mut Runtime, list: Value) -> Value {
     Value::Boolean(list == Value::List(None))
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn _al_list_to_tuple(runtime: &Runtime, list: Value) -> Value {
+pub unsafe extern "C" fn _al_list_to_tuple(runtime: &mut Runtime, list: Value) -> Value {
     let Value::List(mut list) = list else {
         throw(runtime, "Expected list");
     };
@@ -332,22 +330,22 @@ pub unsafe extern "C" fn _al_list_to_tuple(runtime: &Runtime, list: Value) -> Va
         list = v.1;
     }
 
-    Value::Tuple(Gc::new(res))
+    Value::Tuple(Gc::new(runtime, res))
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn _al_list_cons(runtime: &Runtime, head: Value, tail: Value) -> Value {
+pub unsafe extern "C" fn _al_list_cons(runtime: &mut Runtime, head: Value, tail: Value) -> Value {
     let Value::List(tail) = tail else {
         throw(runtime, "Expected list");
     };
 
-    Value::List(cons(head, tail))
+    Value::List(cons(runtime, head, tail))
 }
 
 // case TupleNew, TupleGet, TupleIs, TupleSize, TuplePut
 #[no_mangle]
 pub unsafe extern "C" fn _al_tuple_new(
-    _runtime: &Runtime,
+    runtime: &mut Runtime,
     nargs: usize,
     args: *const Value,
 ) -> Value {
@@ -358,11 +356,11 @@ pub unsafe extern "C" fn _al_tuple_new(
         res.push(arg);
     }
 
-    Value::Tuple(Gc::new(res))
+    Value::Tuple(Gc::new(runtime, res))
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn _al_tuple_get(runtime: &Runtime, tuple: Value, index: Value) -> Value {
+pub unsafe extern "C" fn _al_tuple_get(runtime: &mut Runtime, tuple: Value, index: Value) -> Value {
     let Value::Tuple(tuple) = tuple else {
         throw!(runtime, "Expected tuple: {}", tuple);
     };
@@ -375,7 +373,7 @@ pub unsafe extern "C" fn _al_tuple_get(runtime: &Runtime, tuple: Value, index: V
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn _al_tuple_is(_runtime: &Runtime, tuple: Value) -> Value {
+pub unsafe extern "C" fn _al_tuple_is(_runtime: &mut Runtime, tuple: Value) -> Value {
     match tuple {
         Value::Tuple(_) => Value::Boolean(true),
         _ => Value::Boolean(false),
@@ -383,7 +381,7 @@ pub unsafe extern "C" fn _al_tuple_is(_runtime: &Runtime, tuple: Value) -> Value
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn _al_tuple_size(runtime: &Runtime, tuple: Value) -> Value {
+pub unsafe extern "C" fn _al_tuple_size(runtime: &mut Runtime, tuple: Value) -> Value {
     let Value::Tuple(tuple) = tuple else {
         throw(runtime, "Expected tuple");
     };
@@ -393,7 +391,7 @@ pub unsafe extern "C" fn _al_tuple_size(runtime: &Runtime, tuple: Value) -> Valu
 
 #[no_mangle]
 pub unsafe extern "C" fn _al_tuple_put(
-    runtime: &Runtime,
+    runtime: &mut Runtime,
     tuple: Value,
     index: Value,
     val: Value,
@@ -409,12 +407,12 @@ pub unsafe extern "C" fn _al_tuple_put(
     let mut updated = tuple.deref().clone();
     updated[index as usize] = val;
 
-    Value::Tuple(Gc::new(updated))
+    Value::Tuple(Gc::new(runtime, updated))
 }
 
 // case StringChars, StringSize, StringFromChars, StringSplit, StringFromInt
 #[no_mangle]
-pub unsafe extern "C" fn _al_string_chars(runtime: &Runtime, string: Value) -> Value {
+pub unsafe extern "C" fn _al_string_chars(runtime: &mut Runtime, string: Value) -> Value {
     let Value::Str(string) = string else {
         throw(runtime, "Expected string");
     };
@@ -422,14 +420,14 @@ pub unsafe extern "C" fn _al_string_chars(runtime: &Runtime, string: Value) -> V
     let mut res = None;
 
     for ch in string.chars().rev() {
-        res = cons(Value::Int(ch as i64), res);
+        res = cons(runtime, Value::Int(ch as i64), res);
     }
 
     Value::List(res)
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn _al_string_from_chars(runtime: &Runtime, mut chars: Value) -> Value {
+pub unsafe extern "C" fn _al_string_from_chars(runtime: &mut Runtime, mut chars: Value) -> Value {
     let mut res = String::new();
 
     while let Value::List(Some(list)) = chars {
@@ -446,11 +444,11 @@ pub unsafe extern "C" fn _al_string_from_chars(runtime: &Runtime, mut chars: Val
         chars = Value::List(list.1);
     }
 
-    Value::Str(Gc::new(res))
+    Value::Str(Gc::new(runtime, res))
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn _al_string_size(runtime: &Runtime, string: Value) -> Value {
+pub unsafe extern "C" fn _al_string_size(runtime: &mut Runtime, string: Value) -> Value {
     let Value::Str(string) = string else {
         throw(runtime, "Expected string");
     };
@@ -459,7 +457,11 @@ pub unsafe extern "C" fn _al_string_size(runtime: &Runtime, string: Value) -> Va
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn _al_string_split(runtime: &Runtime, string: Value, sep: Value) -> Value {
+pub unsafe extern "C" fn _al_string_split(
+    runtime: &mut Runtime,
+    string: Value,
+    sep: Value,
+) -> Value {
     let Value::Str(string) = string else {
         throw(runtime, "Expected string");
     };
@@ -473,24 +475,25 @@ pub unsafe extern "C" fn _al_string_split(runtime: &Runtime, string: Value, sep:
     let mut res = None;
 
     for arg in split.iter().rev() {
-        res = cons(Value::Str(Gc::new(arg.to_string())), res);
+        let val = Value::Str(Gc::new(runtime, arg.to_string()));
+        res = cons(runtime, val, res);
     }
 
     Value::List(res)
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn _al_string_from_int(runtime: &Runtime, int: Value) -> Value {
+pub unsafe extern "C" fn _al_string_from_int(runtime: &mut Runtime, int: Value) -> Value {
     let Value::Int(int) = int else {
         throw(runtime, "Expected integer");
     };
 
-    Value::Str(Gc::new(int.to_string()))
+    Value::Str(Gc::new(runtime, int.to_string()))
 }
 
 // case IntIs, IntFromString
 #[no_mangle]
-pub unsafe extern "C" fn _al_int_is(_runtime: &Runtime, int: Value) -> Value {
+pub unsafe extern "C" fn _al_int_is(_runtime: &mut Runtime, int: Value) -> Value {
     match int {
         Value::Int(_) => Value::Boolean(true),
         _ => Value::Boolean(false),
@@ -498,7 +501,7 @@ pub unsafe extern "C" fn _al_int_is(_runtime: &Runtime, int: Value) -> Value {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn _al_int_from_string(runtime: &Runtime, string: Value) -> Value {
+pub unsafe extern "C" fn _al_int_from_string(runtime: &mut Runtime, string: Value) -> Value {
     let Value::Str(string) = string else {
         throw(runtime, "Expected string");
     };
@@ -511,7 +514,7 @@ pub unsafe extern "C" fn _al_int_from_string(runtime: &Runtime, string: Value) -
 
 // case FileReadString
 #[no_mangle]
-pub unsafe extern "C" fn _al_file_read_string(runtime: &Runtime, path: Value) -> Value {
+pub unsafe extern "C" fn _al_file_read_string(runtime: &mut Runtime, path: Value) -> Value {
     let Value::Str(path) = path else {
         throw(runtime, "Expected string");
     };
@@ -520,69 +523,68 @@ pub unsafe extern "C" fn _al_file_read_string(runtime: &Runtime, path: Value) ->
         throw(runtime, "Failed to read file");
     };
 
-    Value::Str(Gc::new(out))
+    Value::Str(Gc::new(runtime, out))
 }
 
 // case ClosureNew
 #[no_mangle]
 pub unsafe extern "C" fn _al_closure_new(
-    runtime: &Runtime,
+    runtime: &mut Runtime,
     fn_ptr: FnPtr,
     nargs: usize,
     args: *const Value,
 ) -> Value {
     let env = _al_tuple_new(runtime, nargs, args);
-    let closure = Gc::new(Closure { fn_ptr, env });
+    let closure = Gc::new(runtime, Closure { fn_ptr, env });
     Value::Closure(closure)
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn _al_closure_new_empty(_runtime: &Runtime, fn_ptr: FnPtr) -> Value {
+pub unsafe extern "C" fn _al_closure_new_empty(_runtime: &mut Runtime, fn_ptr: FnPtr) -> Value {
     Value::Fn(fn_ptr)
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn _al_true_new(_runtime: &Runtime) -> Value {
+pub unsafe extern "C" fn _al_true_new(_runtime: &mut Runtime) -> Value {
     Value::Boolean(true)
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn _al_false_new(_runtime: &Runtime) -> Value {
+pub unsafe extern "C" fn _al_false_new(_runtime: &mut Runtime) -> Value {
     Value::Boolean(false)
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn _al_string_new(_runtime: &Runtime, val: *const c_char) -> Value {
+pub unsafe extern "C" fn _al_string_new(runtime: &mut Runtime, val: *const c_char) -> Value {
     let val = unsafe { CStr::from_ptr(val).to_str().unwrap().to_owned() };
-    Value::Str(Gc::new(val))
+    Value::Str(Gc::new(runtime, val))
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn _al_int_new(_runtime: &Runtime, val: i64) -> Value {
+pub unsafe extern "C" fn _al_int_new(_runtime: &mut Runtime, val: i64) -> Value {
     Value::Int(val)
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn _al_float_new(_runtime: &Runtime, val: f64) -> Value {
+pub unsafe extern "C" fn _al_float_new(_runtime: &mut Runtime, val: f64) -> Value {
     Value::Float(HFloat(val))
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn _al_sym_new(runtime: &Runtime, val: *const c_char) -> Value {
+pub unsafe extern "C" fn _al_sym_new(runtime: &mut Runtime, val: *const c_char) -> Value {
     let val = unsafe { CStr::from_ptr(val).to_str().unwrap() };
-    let mut symbol_table = runtime.symbol_table.lock().unwrap();
 
-    if let Some(v) = symbol_table.get(val).copied() {
+    if let Some(v) = runtime.symbol_table.get(val).copied() {
         Value::Symbol(Symbol(v))
     } else {
         let v = Box::leak(Box::new(String::leak(val.to_string()) as &'static str));
-        symbol_table.insert(val.to_string(), v);
+        runtime.symbol_table.insert(val.to_string(), v);
         Value::Symbol(Symbol(v))
     }
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn _al_get_bool(runtime: &Runtime, val: Value) -> bool {
+pub unsafe extern "C" fn _al_get_bool(runtime: &mut Runtime, val: Value) -> bool {
     match val {
         Value::Boolean(b) => b,
         _ => throw(runtime, "Expected boolean"),
@@ -591,7 +593,7 @@ pub unsafe extern "C" fn _al_get_bool(runtime: &Runtime, val: Value) -> bool {
 
 #[no_mangle]
 pub unsafe extern "C" fn _al_call(
-    runtime: &Runtime,
+    runtime: &mut Runtime,
     fn_ptr: Value,
     nargs: usize,
     args: *const Value,
@@ -680,18 +682,16 @@ pub unsafe extern "C" fn _al_raise(val: Value) -> bool {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn _al_runtime_new() -> *const Runtime {
-    let mut symtab = HashMap::new();
-    symtab.insert("none".to_string(), &NONE_SYMBOL_PTR_TARGET);
-    symtab.insert("some".to_string(), &SOME_SYMBOL_PTR_TARGET);
+pub unsafe extern "C" fn _al_runtime_new() -> *mut Runtime {
+    let mut symbol_table = HashMap::new();
+    symbol_table.insert("none".to_string(), &NONE_SYMBOL_PTR_TARGET);
+    symbol_table.insert("some".to_string(), &SOME_SYMBOL_PTR_TARGET);
 
-    Box::into_raw(Box::new(Runtime {
-        symbol_table: Mutex::new(symtab),
-    }))
+    Box::into_raw(Box::new(Runtime { symbol_table }))
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn _al_test_harness(rt: &Runtime, f: FnPtr, name: *const c_char) {
+pub unsafe extern "C" fn _al_test_harness(rt: &mut Runtime, f: FnPtr, name: *const c_char) {
     let name = CStr::from_ptr(name).to_str().unwrap();
 
     let f = f.f0;
@@ -709,4 +709,12 @@ pub unsafe extern "C" fn _al_test_harness(rt: &Runtime, f: FnPtr, name: *const c
             println!("\x1b[31mFAILED\x1b[0m");
         }
     }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn _al_enter_frame(
+    _runtime: &mut Runtime,
+    _nloc: usize,
+    _frame: *const Value,
+) {
 }
