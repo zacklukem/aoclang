@@ -60,6 +60,7 @@ class Gen(f: PrintWriter):
       write(
         s"value_t ${genName(name)}(runtime_t *rt${args.map(v => s", value_t _arg_$v").mkString}) {"
       )
+      writeInst("value_t _ret;")
       writeInst(s"struct {")
       args.foreach { arg =>
         writeInst(s"\tvalue_t _$arg;")
@@ -174,6 +175,7 @@ class Gen(f: PrintWriter):
         genBody(body)
 
       case Tree.AppF(name: Symbol.Global, Symbol.Ret, args) =>
+        writeInst("_al_exit_frame(rt);")
         writeInst(
           s"return ${genName(name)}(rt${args.map(v => s", ${genNameClosed(v)}").mkString});"
         )
@@ -189,6 +191,7 @@ class Gen(f: PrintWriter):
 
       case Tree.AppF(fn, Symbol.Ret, args) =>
         genTempArray(args)
+        writeInst("_al_exit_frame(rt);")
         writeInst(
           s"return _al_call(rt, ${genName(fn)}, ${args.length}, locals._tmp_arr);"
         )
@@ -204,6 +207,7 @@ class Gen(f: PrintWriter):
         continue()
 
       case Tree.AppC(Symbol.Ret, List(arg)) =>
+        writeInst("_al_exit_frame(rt);")
         writeInst(s"return ${genName(arg)};")
         continue()
 
@@ -221,7 +225,7 @@ class Gen(f: PrintWriter):
 
       case Tree.Raise(value) =>
         writeInst(s"_al_raise(${genNameClosed(value)});")
-        writeInst(s"return _al_sym_new(rt, \"unreachable\");")
+        writeInst(s"return (value_t){0, 0};")
         continue()
 
       case Tree.LetF(name, args, value, body) => !!!

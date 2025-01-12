@@ -111,6 +111,13 @@ def loadFiles()(using opt: Config) =
   files
 
 def compileCmd()(using opt: Config): Unit =
+  def tryx(x: ProcessBuilder) =
+    val log = ProcessLogger(System.out.println, System.err.println)
+    if x.!(log) != 0 then
+      System.err.println("PROCESS FAILED")
+      System.out.flush()
+      System.err.flush()
+      System.exit(1)
   val files = loadFiles()
   val (decls, _) = build(files)
   Files.deleteIfExists(Path.of("out.c"))
@@ -118,11 +125,13 @@ def compileCmd()(using opt: Config): Unit =
   val w = PrintWriter(cfile)
   Gen(w).genAll(decls)
   println("Building runtime...")
-  Process("cargo build --release", File(opt.aoc_home, "rt")).!
+  tryx(Process("cargo build --release", File(opt.aoc_home, "rt")))
   println("Building c file...")
-  s"cc -O3 ${cfile.getAbsolutePath} ${opt.aoc_home}/rt/target/release/librt.a -I${opt.aoc_home}/rt/include -o a.out".!
+  tryx(
+    s"cc -O3 ${cfile.getAbsolutePath} ${opt.aoc_home}/rt/target/release/librt.a -I${opt.aoc_home}/rt/include -o a.out"
+  )
   println("Running executable...")
-  s"./a.out".!
+  tryx(s"./a.out")
 
 def testCmd()(using opt: Config): Unit =
   val files = loadFiles()

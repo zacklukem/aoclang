@@ -1,13 +1,26 @@
+use crate::Runtime;
 use std::{
     hash::{Hash, Hasher},
+    mem,
     ops::{Deref, DerefMut},
     ptr::NonNull,
 };
-use crate::Runtime;
+
+pub struct GcHeader<T> {
+    next: Option<NonNull<GcHeader<()>>>,
+    dropper: unsafe fn(NonNull<Self>),
+    val: T,
+}
+
+impl GcHeader<()> {
+    pub unsafe fn free(this: NonNull<Self>) {
+        (this.as_ref().dropper)(this)
+    }
+}
 
 #[repr(transparent)]
 pub struct Gc<T> {
-    pub(crate) ptr: NonNull<T>,
+    pub(crate) ptr: NonNull<GcHeader<T>>,
 }
 
 impl<T: Hash> Hash for Gc<T> {
@@ -26,13 +39,13 @@ impl<T> Deref for Gc<T> {
     type Target = T;
 
     fn deref(&self) -> &T {
-        unsafe { self.ptr.as_ref() }
+        unsafe { &self.ptr.as_ref().val }
     }
 }
 
 impl<T> DerefMut for Gc<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        unsafe { self.ptr.as_mut() }
+        unsafe { &mut self.ptr.as_mut().val }
     }
 }
 
@@ -45,10 +58,19 @@ impl<T> Clone for Gc<T> {
 impl<T> Copy for Gc<T> {}
 
 impl<T> Gc<T> {
-    pub fn new(_runtime: &mut Runtime, data: T) -> Self {
-        Gc {
-            ptr: unsafe { NonNull::new_unchecked(Box::into_raw(Box::new(data))) },
-        }
+    unsafe fn dropper(this: NonNull<GcHeader<T>>) {
+        drop(Box::from_raw(this.as_ptr()))
+    }
+
+    pub fn new(runtime: &mut Runtime, data: T) -> Self {
+        let header = GcHeader {
+            next: runtime.gc_root,
+            dropper: Self::dropper,
+            val: data,
+        };
+        let ptr = unsafe { NonNull::new_unchecked(Box::into_raw(Box::new(header))) };
+        runtime.gc_root = Some(unsafe { mem::transmute(ptr) });
+        Gc { ptr }
     }
 }
 

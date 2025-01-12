@@ -5,7 +5,9 @@
 mod gc;
 mod value;
 
+use crate::gc::GcHeader;
 use gc::Gc;
+use std::ptr::NonNull;
 use std::{
     char,
     collections::HashMap,
@@ -22,7 +24,8 @@ use value::{
 
 pub struct Runtime<'a> {
     symbol_table: HashMap<String, &'static &'static str>,
-    frames: Vec<&'a [Value]>
+    frames: Vec<&'a [Value]>,
+    gc_root: Option<NonNull<GcHeader<()>>>,
 }
 
 fn throw(_runtime: &Runtime, msg: &str) -> ! {
@@ -254,7 +257,9 @@ pub unsafe extern "C" fn _al_shr(runtime: &mut Runtime, a: Value, b: Value) -> V
 #[no_mangle]
 pub unsafe extern "C" fn _al_concat(runtime: &mut Runtime, a: Value, b: Value) -> Value {
     match (a, b) {
-        (Value::Str(a), Value::Str(b)) => Value::Str(Gc::new(runtime, a.as_ref().clone().add(b.as_ref()))),
+        (Value::Str(a), Value::Str(b)) => {
+            Value::Str(Gc::new(runtime, a.as_ref().clone().add(b.as_ref())))
+        }
         (Value::Str(a), v) => Value::Str(Gc::new(runtime, format!("{}{}", a.as_ref(), v))),
         (v, Value::Str(a)) => Value::Str(Gc::new(runtime, format!("{}{}", v, a.as_ref()))),
         (a, b) => Value::Str(Gc::new(runtime, format!("{a}{b}"))),
@@ -688,7 +693,11 @@ pub unsafe extern "C" fn _al_runtime_new<'a>() -> *mut Runtime<'a> {
     symbol_table.insert("none".to_string(), &NONE_SYMBOL_PTR_TARGET);
     symbol_table.insert("some".to_string(), &SOME_SYMBOL_PTR_TARGET);
 
-    Box::into_raw(Box::new(Runtime { symbol_table, frames: Vec::new() }))
+    Box::into_raw(Box::new(Runtime {
+        symbol_table,
+        frames: Vec::new(),
+        gc_root: None,
+    }))
 }
 
 #[no_mangle]
@@ -713,11 +722,13 @@ pub unsafe extern "C" fn _al_test_harness(rt: &mut Runtime, f: FnPtr, name: *con
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn _al_enter_frame(
-    _runtime: &mut Runtime,
-    nloc: usize,
-    frame: *mut Value,
-) {
+pub unsafe extern "C" fn _al_enter_frame(runtime: &mut Runtime, nloc: usize, frame: *mut Value) {
     let frame = slice::from_raw_parts_mut(frame, nloc);
     frame.fill(NONE);
+    runtime.frames.push(frame);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn _al_exit_frame(runtime: &mut Runtime) {
+    runtime.frames.pop();
 }
