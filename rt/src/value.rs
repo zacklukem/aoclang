@@ -148,7 +148,7 @@ impl Display for Value {
                 write!(f, ")")
             }
             Value::Str(gc) => write!(f, "{}", gc.as_ref()),
-            Value::Closure(gc) => write!(f, "<closure>"),
+            Value::Closure(_gc) => write!(f, "<closure>"),
             Value::Int(v) => write!(f, "{}", v),
             Value::Float(HFloat(hfloat)) => write!(f, "{}", hfloat),
             Value::Boolean(v) => write!(f, "{}", v),
