@@ -79,6 +79,3 @@ impl<T: PartialEq> PartialEq for Gc<T> {
         self.ptr == other.ptr || self.deref() == other.deref()
     }
 }
-
-unsafe impl<T> Send for Gc<T> {}
-unsafe impl<T> Sync for Gc<T> {}

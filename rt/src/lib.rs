@@ -18,7 +18,7 @@ use std::{
     panic, slice,
 };
 use value::{
-    cons, Closure, FnPtr, HFloat, Ref, Symbol, Value, NONE, NONE_SYMBOL_PTR_TARGET, SOME,
+    cons, none, some, Closure, FnPtr, HFloat, Ref, Symbol, Value, NONE_SYMBOL_PTR_TARGET,
     SOME_SYMBOL_PTR_TARGET,
 };
 
@@ -51,7 +51,7 @@ pub unsafe extern "C" fn _al_print_line(_runtime: &mut Runtime, line: Value) -> 
         }
     }
 
-    NONE
+    none()
 }
 
 #[no_mangle]
@@ -59,7 +59,7 @@ pub unsafe extern "C" fn _al_assert(runtime: &mut Runtime, val: Value) -> Value 
     if let Value::Boolean(false) = val {
         throw(runtime, "Assertion failed");
     } else {
-        NONE
+        none()
     }
 }
 
@@ -68,7 +68,7 @@ pub unsafe extern "C" fn _al_assert_eq(runtime: &mut Runtime, lhs: Value, rhs: V
     if lhs != rhs {
         throw!(runtime, "Assertion failed: {lhs} != {rhs}");
     } else {
-        NONE
+        none()
     }
 }
 
@@ -94,7 +94,7 @@ pub unsafe extern "C" fn _al_store(runtime: &mut Runtime, target: Value, val: Va
         throw(runtime, "Expected reference");
     }
 
-    NONE
+    none()
 }
 
 #[no_mangle]
@@ -295,8 +295,8 @@ pub unsafe extern "C" fn _al_list_new(
 #[no_mangle]
 pub unsafe extern "C" fn _al_list_head(runtime: &mut Runtime, list: Value) -> Value {
     match list {
-        Value::List(Some(list)) => Value::Tuple(Gc::new(runtime, vec![SOME, list.0])),
-        Value::List(None) => NONE,
+        Value::List(Some(list)) => Value::Tuple(Gc::new(runtime, vec![some(), list.0])),
+        Value::List(None) => none(),
         _ => throw(runtime, "Expected list"),
     }
 }
@@ -305,7 +305,7 @@ pub unsafe extern "C" fn _al_list_head(runtime: &mut Runtime, list: Value) -> Va
 pub unsafe extern "C" fn _al_list_tail(runtime: &mut Runtime, list: Value) -> Value {
     match list {
         Value::List(Some(list)) => Value::List(list.1),
-        Value::List(None) => NONE,
+        Value::List(None) => none(),
         _ => throw(runtime, "Expected list"),
     }
 }
@@ -724,7 +724,7 @@ pub unsafe extern "C" fn _al_test_harness(rt: &mut Runtime, f: FnPtr, name: *con
 #[no_mangle]
 pub unsafe extern "C" fn _al_enter_frame(runtime: &mut Runtime, nloc: usize, frame: *mut Value) {
     let frame = slice::from_raw_parts_mut(frame, nloc);
-    frame.fill(NONE);
+    frame.fill(none());
     runtime.frames.push(frame);
 }
 

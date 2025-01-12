@@ -2,10 +2,14 @@ use crate::{gc::Gc, Runtime};
 use std::{fmt::Display, hash::Hash, ptr};
 
 pub static NONE_SYMBOL_PTR_TARGET: &str = "none";
-pub static NONE: Value = Value::Symbol(Symbol(&NONE_SYMBOL_PTR_TARGET));
+pub fn none() -> Value {
+    Value::Symbol(Symbol(&NONE_SYMBOL_PTR_TARGET))
+}
 
 pub static SOME_SYMBOL_PTR_TARGET: &str = "some";
-pub static SOME: Value = Value::Symbol(Symbol(&SOME_SYMBOL_PTR_TARGET));
+pub fn some() -> Value {
+    Value::Symbol(Symbol(&SOME_SYMBOL_PTR_TARGET))
+}
 
 #[repr(transparent)]
 #[derive(Clone, Copy)]
