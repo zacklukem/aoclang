@@ -124,7 +124,7 @@ class Gen(f: PrintWriter):
   // String | Long | Double | Boolean | Sym
   def genValue(v: LitValue): String =
     v match
-      case s: String  => s"_al_string_new(rt, \"$s\")"
+      case s: String  => s"_al_string_new(rt, \"${s.replaceAll("\n", "\\n")}\")"
       case i: Long    => s"_al_int_new(rt, ${i}LL)"
       case d: Double  => s"_al_float_new(rt, ${d})"
       case b: Boolean => if b then "_al_true_new(rt)" else "_al_false_new(rt)"
