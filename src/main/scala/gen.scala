@@ -66,8 +66,8 @@ class Gen(f: PrintWriter):
         writeInst(s"\tvalue_t _$arg;")
       }
       // TODO: find max temp size
-      val ntmp = 50;
-      val nloc = genLocals(tree) + args.length + ntmp;
+      val ntmp = maxTmpArr(tree, name)
+      val nloc = genLocals(tree) + args.length + ntmp
       writeInst(s"\tvalue_t _tmp_arr[$ntmp];")
       writeInst("} locals;")
       writeInst(s"_al_enter_frame(rt, $nloc, (void*)&locals);")
@@ -134,6 +134,36 @@ class Gen(f: PrintWriter):
     vs.zipWithIndex.foreach { case (v, i) =>
       writeInst(s"locals._tmp_arr[$i] = ${genNameClosed(v)};")
     }
+
+  def maxTmpArr(t: Tree, tailName: Symbol): Int =
+    var max = 0
+    def maxTmpArr(t: Tree): Unit =
+      t match
+        case Tree.LetC(name, args, value, body) =>
+          maxTmpArr(value)
+          maxTmpArr(body)
+
+        case Tree.LetL(name, value, body) =>
+          maxTmpArr(body)
+
+        case Tree.LetP(name, PrimOp.ClosureNew, fn :: args, body) =>
+          max = max.max(args.length)
+          maxTmpArr(body)
+
+        case p @ Tree.LetP(name, PrimOp.ListNew | PrimOp.TupleNew, args, body) =>
+          max = max.max(args.length)
+          maxTmpArr(body)
+
+        case Tree.LetP(name, prim, args, body) =>
+          maxTmpArr(body)
+
+        case Tree.AppF(fn, retC, args) if fn != tailName =>
+          max = max.max(args.length)
+
+        case _ => ()
+
+    maxTmpArr(t)
+    max
 
   def genBody(
       t: Tree
