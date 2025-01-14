@@ -6,7 +6,7 @@ mod gc;
 mod value;
 
 use crate::gc::GcHeader;
-use gc::Gc;
+use gc::{Gc, Markable};
 use std::ptr::NonNull;
 use std::{
     char,
@@ -25,7 +25,27 @@ use value::{
 pub struct Runtime<'a> {
     symbol_table: HashMap<String, &'static &'static str>,
     frames: Vec<&'a [Value]>,
-    gc_root: Option<NonNull<GcHeader<()>>>,
+    gc_root: Option<NonNull<GcHeader<usize>>>,
+    rust_frame: Vec<Box<dyn Markable>>,
+}
+
+impl Runtime<'_> {
+    pub fn guard(&mut self) {
+        self.rust_frame.clear();
+    }
+
+    pub fn new() -> Self {
+        let mut symbol_table = HashMap::new();
+        symbol_table.insert("none".to_string(), &NONE_SYMBOL_PTR_TARGET);
+        symbol_table.insert("some".to_string(), &SOME_SYMBOL_PTR_TARGET);
+
+        Self {
+            symbol_table,
+            frames: Vec::new(),
+            gc_root: None,
+            rust_frame: Vec::new(),
+        }
+    }
 }
 
 fn throw(_runtime: &Runtime, msg: &str) -> ! {
@@ -83,6 +103,7 @@ pub unsafe extern "C" fn _al_hash_code(_runtime: &mut Runtime, val: Value) -> Va
 // case Ref, Store, Load
 #[no_mangle]
 pub unsafe extern "C" fn _al_ref(runtime: &mut Runtime, val: Value) -> Value {
+    runtime.guard();
     Value::Ref(Ref(Gc::new(runtime, val)))
 }
 
@@ -281,6 +302,7 @@ pub unsafe extern "C" fn _al_list_new(
     nargs: usize,
     args: *const Value,
 ) -> Value {
+    runtime.guard();
     let mut res = None;
 
     let args = unsafe { slice::from_raw_parts(args, nargs) };
@@ -294,6 +316,7 @@ pub unsafe extern "C" fn _al_list_new(
 
 #[no_mangle]
 pub unsafe extern "C" fn _al_list_head(runtime: &mut Runtime, list: Value) -> Value {
+    runtime.guard();
     match list {
         Value::List(Some(list)) => Value::Tuple(Gc::new(runtime, vec![some(), list.0])),
         Value::List(None) => none(),
@@ -325,6 +348,7 @@ pub unsafe extern "C" fn _al_list_is_empty(_runtime: &mut Runtime, list: Value) 
 
 #[no_mangle]
 pub unsafe extern "C" fn _al_list_to_tuple(runtime: &mut Runtime, list: Value) -> Value {
+    runtime.guard();
     let Value::List(mut list) = list else {
         throw(runtime, "Expected list");
     };
@@ -341,6 +365,7 @@ pub unsafe extern "C" fn _al_list_to_tuple(runtime: &mut Runtime, list: Value) -
 
 #[no_mangle]
 pub unsafe extern "C" fn _al_list_cons(runtime: &mut Runtime, head: Value, tail: Value) -> Value {
+    runtime.guard();
     let Value::List(tail) = tail else {
         throw(runtime, "Expected list");
     };
@@ -355,6 +380,7 @@ pub unsafe extern "C" fn _al_tuple_new(
     nargs: usize,
     args: *const Value,
 ) -> Value {
+    runtime.guard();
     let mut res = Vec::with_capacity(nargs);
 
     for i in 0..nargs {
@@ -402,6 +428,7 @@ pub unsafe extern "C" fn _al_tuple_put(
     index: Value,
     val: Value,
 ) -> Value {
+    runtime.guard();
     let Value::Tuple(tuple) = tuple else {
         throw(runtime, "Expected tuple");
     };
@@ -419,6 +446,7 @@ pub unsafe extern "C" fn _al_tuple_put(
 // case StringChars, StringSize, StringFromChars, StringSplit, StringFromInt
 #[no_mangle]
 pub unsafe extern "C" fn _al_string_chars(runtime: &mut Runtime, string: Value) -> Value {
+    runtime.guard();
     let Value::Str(string) = string else {
         throw(runtime, "Expected string");
     };
@@ -434,6 +462,7 @@ pub unsafe extern "C" fn _al_string_chars(runtime: &mut Runtime, string: Value) 
 
 #[no_mangle]
 pub unsafe extern "C" fn _al_string_from_chars(runtime: &mut Runtime, mut chars: Value) -> Value {
+    runtime.guard();
     let mut res = String::new();
 
     while let Value::List(Some(list)) = chars {
@@ -468,6 +497,7 @@ pub unsafe extern "C" fn _al_string_split(
     string: Value,
     sep: Value,
 ) -> Value {
+    runtime.guard();
     let Value::Str(string) = string else {
         throw(runtime, "Expected string");
     };
@@ -490,6 +520,7 @@ pub unsafe extern "C" fn _al_string_split(
 
 #[no_mangle]
 pub unsafe extern "C" fn _al_string_from_int(runtime: &mut Runtime, int: Value) -> Value {
+    runtime.guard();
     let Value::Int(int) = int else {
         throw(runtime, "Expected integer");
     };
@@ -521,6 +552,7 @@ pub unsafe extern "C" fn _al_int_from_string(runtime: &mut Runtime, string: Valu
 // case FileReadString
 #[no_mangle]
 pub unsafe extern "C" fn _al_file_read_string(runtime: &mut Runtime, path: Value) -> Value {
+    runtime.guard();
     let Value::Str(path) = path else {
         throw(runtime, "Expected string");
     };
@@ -540,6 +572,7 @@ pub unsafe extern "C" fn _al_closure_new(
     nargs: usize,
     args: *const Value,
 ) -> Value {
+    runtime.guard();
     let env = _al_tuple_new(runtime, nargs, args);
     let closure = Gc::new(runtime, Closure { fn_ptr, env });
     Value::Closure(closure)
@@ -562,6 +595,7 @@ pub unsafe extern "C" fn _al_false_new(_runtime: &mut Runtime) -> Value {
 
 #[no_mangle]
 pub unsafe extern "C" fn _al_string_new(runtime: &mut Runtime, val: *const c_char) -> Value {
+    runtime.guard();
     let val = unsafe { CStr::from_ptr(val).to_str().unwrap().to_owned() };
     Value::Str(Gc::new(runtime, val))
 }
@@ -689,19 +723,11 @@ pub unsafe extern "C" fn _al_raise(val: Value) -> bool {
 
 #[no_mangle]
 pub unsafe extern "C" fn _al_runtime_new<'a>() -> *mut Runtime<'a> {
-    let mut symbol_table = HashMap::new();
-    symbol_table.insert("none".to_string(), &NONE_SYMBOL_PTR_TARGET);
-    symbol_table.insert("some".to_string(), &SOME_SYMBOL_PTR_TARGET);
-
-    Box::into_raw(Box::new(Runtime {
-        symbol_table,
-        frames: Vec::new(),
-        gc_root: None,
-    }))
+    Box::into_raw(Box::new(Runtime::new()))
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn _al_test_harness(rt: &mut Runtime, f: FnPtr, name: *const c_char) {
+pub unsafe extern "C" fn _al_test_harness(f: FnPtr, name: *const c_char) {
     let name = CStr::from_ptr(name).to_str().unwrap();
 
     let f = f.f0;
@@ -710,7 +736,10 @@ pub unsafe extern "C" fn _al_test_harness(rt: &mut Runtime, f: FnPtr, name: *con
 
     let time_start = std::time::Instant::now();
 
-    match panic::catch_unwind(|| f(rt)) {
+    match panic::catch_unwind(|| {
+        let mut rt = Box::new(Runtime::new());
+        f(&mut rt);
+    }) {
         Ok(_) => {
             let elapsed = time_start.elapsed();
             println!("\x1b[32mPASS ({}ms)\x1b[0m", elapsed.as_millis_f64());

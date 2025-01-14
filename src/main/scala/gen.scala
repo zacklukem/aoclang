@@ -79,12 +79,11 @@ class Gen(f: PrintWriter):
     }
 
     write(s"int main(int argc, char **argv) {")
-    writeInst("runtime_t *rt = _al_runtime_new();")
     decls.toSeq
       .filter((name, _) => isTest(name))
       .sortBy(_._1.toString)
       .foreach { case (name, Decl.Def(args, tree)) =>
-        writeInst(s"_al_test_harness(rt, (void*)${genName(name)}, \"$name\");")
+        writeInst(s"_al_test_harness((void*)${genName(name)}, \"$name\");")
       }
     write("}")
 

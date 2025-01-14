@@ -128,7 +128,7 @@ def compileCmd()(using opt: Config): Unit =
   tryx(Process("cargo build --release", File(opt.aoc_home, "rt")))
   println("Building c file...")
   tryx(
-    s"cc -O3 ${cfile.getAbsolutePath} ${opt.aoc_home}/rt/target/release/librt.a -I${opt.aoc_home}/rt/include -o a.out"
+    s"cc -g -O3 ${cfile.getAbsolutePath} ${opt.aoc_home}/rt/target/release/librt.a -I${opt.aoc_home}/rt/include -o a.out"
   )
   println("Running executable...")
   tryx(s"./a.out")
