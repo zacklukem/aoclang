@@ -71,10 +71,11 @@ class Gen(f: PrintWriter):
       writeInst(s"\tvalue_t _tmp_arr[$ntmp];")
       writeInst("} locals;")
       writeInst(s"_al_enter_frame(rt, $nloc, (void*)&locals);")
+      write("_tailcall:")
       args.foreach { arg =>
         writeInst(s"${genName(arg)} = _arg_$arg;")
       }
-      genBody(tree)(using Nil, Map.empty)
+      genBody(tree)(using Nil, Map.empty, name, args)
       write("}")
     }
 
@@ -134,7 +135,14 @@ class Gen(f: PrintWriter):
       writeInst(s"locals._tmp_arr[$i] = ${genNameClosed(v)};")
     }
 
-  def genBody(t: Tree)(using queue: List[(Name, Tree)], cEnv: Map[Name, List[Name]]): Unit =
+  def genBody(
+      t: Tree
+  )(using
+      queue: List[(Name, Tree)],
+      cEnv: Map[Name, List[Name]],
+      tailName: Symbol,
+      fnArgs: List[Name]
+  ): Unit =
     def continue() =
       queue.foreach { case (cName, cTree) =>
         write(s"_$cName:")
@@ -172,6 +180,13 @@ class Gen(f: PrintWriter):
           s"${genName(name)} = _al${cleanBuiltin(prim.toString)}(rt${args.map(v => s", ${genNameClosed(v)}").mkString});"
         )
         genBody(body)
+
+      case Tree.AppF(name, Symbol.Ret, args) if name == tailName =>
+        fnArgs.zip(args).foreach { case (fnArg, arg) =>
+          writeInst(s"_arg_$fnArg = ${genNameClosed(arg)};")
+        }
+        writeInst("goto _tailcall;")
+        continue()
 
       case Tree.AppF(name: Symbol.Global, Symbol.Ret, args) =>
         writeInst("_al_exit_frame(rt);")

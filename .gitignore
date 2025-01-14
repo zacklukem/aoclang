@@ -50,3 +50,4 @@ build/
 rt/include/
 *.c
 a.out
+*.dSYM
